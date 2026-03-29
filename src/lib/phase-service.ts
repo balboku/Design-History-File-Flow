@@ -1,5 +1,11 @@
 import { prisma } from './prisma'
-import { ProjectPhase, DeliverableStatus } from '@prisma/client'
+import {
+  ProjectPhase,
+  DeliverableStatus,
+  PendingItemStatus,
+} from '@prisma/client'
+
+import { syncPendingItems } from './pending-item-service'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -9,6 +15,7 @@ export interface PhaseGateIssue {
   deliverableTitle: string
   currentStatus: DeliverableStatus
   reason: string
+  pendingItemId?: string
 }
 
 /** Advance succeeded without any issues. */
@@ -102,6 +109,8 @@ export async function evaluatePhaseGate(
   | { canAdvance: true; nextPhase: ProjectPhase }
   | { canAdvance: false; issues: PhaseGateIssue[]; isHardGate: boolean }
 > {
+  await syncPendingItems(projectId)
+
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: { id: true, code: true, currentPhase: true },
@@ -135,7 +144,7 @@ export async function evaluatePhaseGate(
     },
   })
 
-  const issues: PhaseGateIssue[] = deliverables
+  const deliverableIssues: PhaseGateIssue[] = deliverables
     .filter((d) => d.status !== DeliverableStatus.Released)
     .map((d) => ({
       deliverableId: d.id,
@@ -148,11 +157,56 @@ export async function evaluatePhaseGate(
           : '文件狀態非 Released，QA 尚未核准',
     }))
 
+  const pendingItemIssues = isHardGate
+    ? await prisma.pendingItem.findMany({
+        where: {
+          projectId,
+          status: PendingItemStatus.Open,
+        },
+        include: {
+          deliverable: {
+            select: {
+              id: true,
+              code: true,
+              title: true,
+              status: true,
+            },
+          },
+        },
+      })
+    : []
+
+  const openPendingIssues: PhaseGateIssue[] = pendingItemIssues.map((item) => ({
+    pendingItemId: item.id,
+    deliverableId: item.deliverable.id,
+    deliverableCode: item.deliverable.code,
+    deliverableTitle: item.deliverable.title,
+    currentStatus: item.deliverable.status,
+    reason: '前序階段條件式放行所留下的遺留項尚未補齊',
+  }))
+
+  const issues = isHardGate
+    ? dedupeIssuesByDeliverable([...deliverableIssues, ...openPendingIssues])
+    : deliverableIssues
+
   if (issues.length > 0) {
     return { canAdvance: false, issues, isHardGate }
   }
 
   return { canAdvance: true, nextPhase: target }
+}
+
+function dedupeIssuesByDeliverable(issues: PhaseGateIssue[]): PhaseGateIssue[] {
+  const map = new Map<string, PhaseGateIssue>()
+
+  for (const issue of issues) {
+    const existing = map.get(issue.deliverableId)
+    if (!existing || issue.pendingItemId) {
+      map.set(issue.deliverableId, issue)
+    }
+  }
+
+  return [...map.values()]
 }
 
 // ─── Phase Advance ────────────────────────────────────────────────────────────
@@ -186,8 +240,6 @@ export async function advancePhase(
 
   // ── Gate passed ──────────────────────────────────────────────────────────────
   if (gate.canAdvance) {
-    let previousPhase: ProjectPhase
-
     try {
       const result = await prisma.$transaction(async (tx) => {
         const current = await tx.project.findUnique({
@@ -196,27 +248,30 @@ export async function advancePhase(
         })
         if (!current) throw new Error(`Project not found: ${projectId}`)
 
-        previousPhase = current.currentPhase
-
         const target = getNextPhase(current.currentPhase)
         if (!target) throw new Error('Already at final phase')
 
-        return tx.project.update({
+        const updatedProject = await tx.project.update({
           where: { id: projectId },
           data: { currentPhase: target, previousPhase: current.currentPhase },
           select: { id: true, code: true, name: true, currentPhase: true },
         })
+
+        return {
+          previousPhase: current.currentPhase,
+          project: updatedProject,
+        }
       })
 
       return {
         success: true,
         outcome: 'advanced',
         project: {
-          id: result.id,
-          code: result.code,
-          name: result.name,
-          previousPhase,
-          currentPhase: result.currentPhase,
+          id: result.project.id,
+          code: result.project.code,
+          name: result.project.name,
+          previousPhase: result.previousPhase,
+          currentPhase: result.project.currentPhase,
         },
       }
     } catch (err) {
@@ -254,8 +309,6 @@ export async function advancePhase(
   }
 
   // forceOverride=true — PM accepts risk; advance and record audit
-  let previousPhase: ProjectPhase
-
   try {
     const result = await prisma.$transaction(async (tx) => {
       const current = await tx.project.findUnique({
@@ -264,13 +317,11 @@ export async function advancePhase(
       })
       if (!current) throw new Error(`Project not found: ${projectId}`)
 
-      previousPhase = current.currentPhase
-
       const target = getNextPhase(current.currentPhase)
       if (!target) throw new Error('Already at final phase')
 
       // Persist override as an audit event
-      await tx.phaseTransition.create({
+      const transition = await tx.phaseTransition.create({
         data: {
           projectId,
           fromPhase: current.currentPhase,
@@ -281,22 +332,53 @@ export async function advancePhase(
         },
       })
 
-      return tx.project.update({
+      for (const issue of issues) {
+        await tx.pendingItem.upsert({
+          where: {
+            projectId_deliverableId: {
+              projectId,
+              deliverableId: issue.deliverableId,
+            },
+          },
+          update: {
+            sourceTransitionId: transition.id,
+            title: `${issue.deliverableCode} ${issue.deliverableTitle}`,
+            detail: issue.reason,
+            status: PendingItemStatus.Open,
+            resolvedAt: null,
+          },
+          create: {
+            projectId,
+            deliverableId: issue.deliverableId,
+            sourceTransitionId: transition.id,
+            title: `${issue.deliverableCode} ${issue.deliverableTitle}`,
+            detail: issue.reason,
+            status: PendingItemStatus.Open,
+          },
+        })
+      }
+
+      const updatedProject = await tx.project.update({
         where: { id: projectId },
         data: { currentPhase: target, previousPhase: current.currentPhase },
         select: { id: true, code: true, name: true, currentPhase: true },
       })
+
+      return {
+        previousPhase: current.currentPhase,
+        project: updatedProject,
+      }
     })
 
     return {
       success: true,
       outcome: 'forced',
       project: {
-        id: result.id,
-        code: result.code,
-        name: result.name,
-        previousPhase,
-        currentPhase: result.currentPhase,
+        id: result.project.id,
+        code: result.project.code,
+        name: result.project.name,
+        previousPhase: result.previousPhase,
+        currentPhase: result.project.currentPhase,
       },
       issues,
     }

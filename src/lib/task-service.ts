@@ -142,5 +142,15 @@ export async function completeTask(taskId: string): Promise<CompleteTaskResult> 
     select: { id: true, status: true, completedAt: true },
   })
 
-  return { task: updated }
+  if (!updated.completedAt) {
+    throw new Error('Task completion timestamp was not persisted.')
+  }
+
+  return {
+    task: {
+      id: updated.id,
+      status: updated.status,
+      completedAt: updated.completedAt,
+    },
+  }
 }

@@ -4,7 +4,7 @@ import { advancePhase, evaluatePhaseGate, PhaseGateIssue } from '@/lib/phase-ser
 
 // ─── Evaluate Gate ─────────────────────────────────────────────────────────────
 
-export interface EvaluateGateResult {
+export type EvaluateGateResult = {
   success: true
   canAdvance: true
   nextPhase: string
@@ -23,12 +23,19 @@ export async function evaluatePhaseGateAction(
 ): Promise<EvaluateGateResult> {
   try {
     const result = await evaluatePhaseGate(projectId)
+    if (result.canAdvance) {
+      return {
+        success: true,
+        canAdvance: true,
+        nextPhase: result.nextPhase,
+      }
+    }
+
     return {
       success: true,
-      canAdvance: result.canAdvance,
-      ...(result.canAdvance
-        ? { nextPhase: result.nextPhase }
-        : { issues: result.issues, isHardGate: result.isHardGate }),
+      canAdvance: false,
+      issues: result.issues,
+      isHardGate: result.isHardGate,
     }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) }

@@ -3,7 +3,17 @@ import { execSync } from 'child_process'
 import { prisma } from './prisma'
 import { createTask, completeTask, TASK_COMPLETION_ERROR } from './task-service'
 import { advancePhase, evaluatePhaseGate } from './phase-service'
-import { ProjectPhase, TaskStatus, DeliverableStatus } from '@prisma/client'
+import {
+  listProjectPendingItems,
+  resolvePendingItem,
+  PENDING_ITEM_RESOLUTION_ERROR,
+} from './pending-item-service'
+import {
+  ProjectPhase,
+  TaskStatus,
+  DeliverableStatus,
+  PendingItemStatus,
+} from '@prisma/client'
 
 // Use a separate test SQLite DB
 process.env.DATABASE_URL = 'file:./test.db'
@@ -38,6 +48,7 @@ afterEach(async () => {
   await prisma.taskDeliverable.deleteMany()
   await prisma.task.deleteMany()
   await prisma.fileRevision.deleteMany()
+  await prisma.pendingItem.deleteMany()
   await prisma.deliverablePlaceholder.deleteMany()
   await prisma.phaseTransition.deleteMany()
   await prisma.project.deleteMany()
@@ -79,6 +90,18 @@ async function setupDeliverables(projectId: string, count: number) {
       })
     )
   )
+}
+
+async function setupDeliverable(projectId: string, phase: ProjectPhase, status = DeliverableStatus.Draft) {
+  return prisma.deliverablePlaceholder.create({
+    data: {
+      projectId,
+      code: `DEL-${uid()}`,
+      title: `Deliverable ${phase}`,
+      phase,
+      status,
+    },
+  })
 }
 
 // ─── Tests: createTask ─────────────────────────────────────────────────────────
@@ -255,6 +278,191 @@ describe('completeTask', () => {
     })
 
     await expect(completeTask(result.task.id)).rejects.toThrow(TASK_COMPLETION_ERROR)
+  })
+})
+
+// ─── Tests: phase gates / pending items ───────────────────────────────────────
+
+describe('phase gate pending items', () => {
+  it('soft gate override 會建立 PendingItem，並留下 override 稽核紀錄', async () => {
+    const project = await setupProject()
+    const deliverable = await setupDeliverable(project.id, ProjectPhase.Planning, DeliverableStatus.Draft)
+
+    const warning = await advancePhase(project.id)
+    expect(warning.success).toBe(true)
+    expect(warning.outcome).toBe('warning')
+
+    const forced = await advancePhase(project.id, {
+      forceOverride: true,
+      overriddenById: testUserId,
+      rationale: 'Market pressure',
+    })
+
+    expect(forced.success).toBe(true)
+    expect(forced.outcome).toBe('forced')
+
+    const pendingItems = await prisma.pendingItem.findMany({
+      where: { projectId: project.id },
+    })
+    expect(pendingItems).toHaveLength(1)
+    expect(pendingItems[0].deliverableId).toBe(deliverable.id)
+    expect(pendingItems[0].status).toBe(PendingItemStatus.Open)
+
+    const transition = await prisma.phaseTransition.findFirst({
+      where: { projectId: project.id, wasOverride: true },
+    })
+    expect(transition).not.toBeNull()
+    expect(transition?.triggeredById).toBe(testUserId)
+  })
+
+  it('進入 DesignTransfer 前若仍有 PendingItem，必須被 hard gate 擋下', async () => {
+    const project = await prisma.project.create({
+      data: {
+        code: `PRJ-${uid()}`,
+        name: 'Hard Gate Project',
+        currentPhase: ProjectPhase.Validation,
+      },
+    })
+
+    const deliverable = await setupDeliverable(
+      project.id,
+      ProjectPhase.Verification,
+      DeliverableStatus.Draft,
+    )
+
+    await prisma.pendingItem.create({
+      data: {
+        projectId: project.id,
+        deliverableId: deliverable.id,
+        title: 'Legacy verification evidence',
+        detail: 'Verification report still missing',
+        status: PendingItemStatus.Open,
+      },
+    })
+
+    const gate = await evaluatePhaseGate(project.id)
+    expect(gate.canAdvance).toBe(false)
+    if (gate.canAdvance) {
+      throw new Error('Expected hard gate failure')
+    }
+    expect(gate.isHardGate).toBe(true)
+    expect(gate.issues.some((issue) => issue.reason.includes('遺留項'))).toBe(true)
+
+    const result = await advancePhase(project.id)
+    expect(result.success).toBe(false)
+    if (result.success) {
+      throw new Error('Expected hard gate result')
+    }
+    expect(result.reason).toBe('hard_gate')
+  })
+
+  it('遺留項對應文件 Released 後，hard gate 可通過且 PendingItem 會自動標記為 Resolved', async () => {
+    const project = await prisma.project.create({
+      data: {
+        code: `PRJ-${uid()}`,
+        name: 'Resolved Pending Item Project',
+        currentPhase: ProjectPhase.Validation,
+      },
+    })
+
+    const deliverable = await setupDeliverable(
+      project.id,
+      ProjectPhase.Verification,
+      DeliverableStatus.Draft,
+    )
+
+    const pendingItem = await prisma.pendingItem.create({
+      data: {
+        projectId: project.id,
+        deliverableId: deliverable.id,
+        title: 'Pending verification report',
+        status: PendingItemStatus.Open,
+      },
+    })
+
+    await prisma.deliverablePlaceholder.update({
+      where: { id: deliverable.id },
+      data: { status: DeliverableStatus.Released },
+    })
+
+    const gate = await evaluatePhaseGate(project.id)
+    expect(gate.canAdvance).toBe(true)
+
+    const refreshedPendingItem = await prisma.pendingItem.findUnique({
+      where: { id: pendingItem.id },
+    })
+    expect(refreshedPendingItem?.status).toBe(PendingItemStatus.Resolved)
+    expect(refreshedPendingItem?.resolvedAt).not.toBeNull()
+  })
+
+  it('listProjectPendingItems 會回傳專案遺留項，且只取指定專案', async () => {
+    const projectA = await setupProject()
+    const projectB = await setupProject()
+
+    const deliverableA = await setupDeliverable(
+      projectA.id,
+      ProjectPhase.Planning,
+      DeliverableStatus.Draft,
+    )
+    const deliverableB = await setupDeliverable(
+      projectB.id,
+      ProjectPhase.Planning,
+      DeliverableStatus.Draft,
+    )
+
+    await prisma.pendingItem.create({
+      data: {
+        projectId: projectA.id,
+        deliverableId: deliverableA.id,
+        title: 'Project A pending item',
+        status: PendingItemStatus.Open,
+      },
+    })
+
+    await prisma.pendingItem.create({
+      data: {
+        projectId: projectB.id,
+        deliverableId: deliverableB.id,
+        title: 'Project B pending item',
+        status: PendingItemStatus.Open,
+      },
+    })
+
+    const projectAItems = await listProjectPendingItems(projectA.id)
+    expect(projectAItems).toHaveLength(1)
+    expect(projectAItems[0].projectId).toBe(projectA.id)
+    expect(projectAItems[0].deliverable.id).toBe(deliverableA.id)
+  })
+
+  it('resolvePendingItem 僅允許在 Deliverable 已 Released 時結案', async () => {
+    const project = await setupProject()
+    const deliverable = await setupDeliverable(
+      project.id,
+      ProjectPhase.Planning,
+      DeliverableStatus.Draft,
+    )
+
+    const pendingItem = await prisma.pendingItem.create({
+      data: {
+        projectId: project.id,
+        deliverableId: deliverable.id,
+        title: 'Pending before release',
+        status: PendingItemStatus.Open,
+      },
+    })
+
+    await expect(resolvePendingItem(pendingItem.id)).rejects.toThrow(
+      PENDING_ITEM_RESOLUTION_ERROR,
+    )
+
+    await prisma.deliverablePlaceholder.update({
+      where: { id: deliverable.id },
+      data: { status: DeliverableStatus.Released },
+    })
+
+    const resolved = await resolvePendingItem(pendingItem.id)
+    expect(resolved.status).toBe(PendingItemStatus.Resolved)
+    expect(resolved.resolvedAt).not.toBeNull()
   })
 })
 

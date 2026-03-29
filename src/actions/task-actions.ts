@@ -1,8 +1,6 @@
 'use server'
 
-import { prisma } from '@/lib/prisma'
 import { createTask, completeTask, TASK_COMPLETION_ERROR } from '@/lib/task-service'
-import { CreateTaskInput } from '@/lib/task-service'
 import { ProjectPhase } from '@prisma/client'
 
 // ─── Create Task ──────────────────────────────────────────────────────────────
@@ -18,7 +16,7 @@ export interface CreateTaskActionInput {
   deliverableIds: string[]
 }
 
-export interface CreateTaskActionResult {
+export type CreateTaskActionResult = {
   success: true
   data: Awaited<ReturnType<typeof createTask>>['task']
 } | {
@@ -40,7 +38,7 @@ export async function createTaskAction(
 
 // ─── Complete Task ────────────────────────────────────────────────────────────
 
-export interface CompleteTaskActionResult {
+export type CompleteTaskActionResult = {
   success: true
   data: Awaited<ReturnType<typeof completeTask>>['task']
 } | {
