@@ -20,7 +20,7 @@
     "types": [
       "node"
     ],
-    "ignoreDeprecations": "6.0",
+    "ignoreDeprecations": "5.0",
     "resolveJsonModule": true,
     "allowJs": true,
     "isolatedModules": true,
