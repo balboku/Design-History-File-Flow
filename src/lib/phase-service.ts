@@ -85,7 +85,7 @@ export type AdvancePhaseResult =
 
 // ─── Phase ordering ───────────────────────────────────────────────────────────
 
-const PHASE_ORDER: ProjectPhase[] = [
+export const PHASE_ORDER: ProjectPhase[] = [
   ProjectPhase.Concept,
   ProjectPhase.Planning,
   ProjectPhase.DesignInput,
@@ -134,10 +134,8 @@ export async function evaluatePhaseGate(
     throw new Error(`Project is already at the final phase: ${project.currentPhase}`)
   }
 
-  // C-6: Both DesignTransfer and PostMarket entries are hard gates
-  const isHardGate =
-    target === ProjectPhase.DesignTransfer ||
-    target === ProjectPhase.PostMarket
+  // C-6: Passing Design Transfer (entering PostMarket) is the formal hard gate
+  const isHardGate = target === ProjectPhase.PostMarket
 
   // Hard gate: check ALL required deliverables across all prior + current phases.
   // Soft gate: check only deliverables for the current phase.
@@ -285,10 +283,8 @@ export async function advancePhase(
       const target = getNextPhase(current.currentPhase)
       if (!target) throw new Error('Already at final phase')
 
-      // C-6: DesignTransfer 與 PostMarket 轉換都視為硬關卡
-      const isHardGate =
-        target === ProjectPhase.DesignTransfer ||
-        target === ProjectPhase.PostMarket
+      // C-6: Passing Design Transfer (entering PostMarket) is the formal hard gate
+      const isHardGate = target === ProjectPhase.PostMarket
 
       // 在交易內查詢 gate 狀態（原子性保證）
       const whereClause = isHardGate
@@ -363,8 +359,6 @@ export async function advancePhase(
             fromPhase: current.currentPhase,
             toPhase: target,
             triggeredById,
-            wasOverride: false,
-            overrideReason: null,
           },
         })
 
@@ -374,7 +368,7 @@ export async function advancePhase(
           select: { id: true, code: true, name: true, currentPhase: true },
         })
 
-        if (target === ProjectPhase.DesignTransfer) {
+        if (target === ProjectPhase.PostMarket) {
           await lockTransferredDeliverables(tx, projectId)
         }
 
@@ -426,11 +420,18 @@ export async function advancePhase(
           projectId,
           fromPhase: current.currentPhase,
           toPhase: target,
-          triggeredById: options.overriddenById ?? null,
-          wasOverride: true,
-          overrideReason: options.rationale ?? null,
+          triggeredById: options.triggeredById ?? null,
+          overrideDecision: {
+            create: {
+              approverId: options.overriddenById ?? null,
+              rationale: options.rationale ?? null,
+            }
+          }
         },
+        include: { overrideDecision: true }
       })
+
+      const overrideDecisionId = transition.overrideDecision!.id
 
       for (const issue of issues) {
         await tx.pendingItem.upsert({
@@ -441,7 +442,7 @@ export async function advancePhase(
             },
           },
           update: {
-            sourceTransitionId: transition.id,
+            sourceOverrideId: overrideDecisionId,
             title: `${issue.deliverableCode} ${issue.deliverableTitle}`,
             detail: issue.reason,
             status: PendingItemStatus.Open,
@@ -450,7 +451,7 @@ export async function advancePhase(
           create: {
             projectId,
             deliverableId: issue.deliverableId,
-            sourceTransitionId: transition.id,
+            sourceOverrideId: overrideDecisionId,
             title: `${issue.deliverableCode} ${issue.deliverableTitle}`,
             detail: issue.reason,
             status: PendingItemStatus.Open,
@@ -465,7 +466,7 @@ export async function advancePhase(
       })
 
       // Note: lockTransferredDeliverables is handled in the 'advanced' path only.
-      // In the 'forced' path, target can never be DesignTransfer because
+      // In the 'forced' path, target can never be PostMarket because
       // it would have been caught by the hard gate check above.
 
       await recordAudit({
@@ -477,6 +478,7 @@ export async function advancePhase(
           from: current.currentPhase,
           to: target,
           outcome: 'forced',
+          triggeredBy: options.triggeredById,
           rationale: options.rationale ?? null,
           issueCount: issues.length,
         },

@@ -98,6 +98,7 @@ export interface CreateDeliverableInput {
   phase: ProjectPhase
   ownerId?: string | null
   isRequired?: boolean
+  actorId: string
 }
 
 export interface CreateDeliverableResult {
@@ -116,6 +117,10 @@ export async function createDeliverable(
 ): Promise<CreateDeliverableResult> {
   const code = input.code.trim()
   const title = input.title.trim()
+
+  if (!input.actorId) {
+    throw new Error('操作必須提供使用者 ID (actorId)。')
+  }
 
   if (!code) {
     throw new Error('Deliverable code is required.')
@@ -169,7 +174,7 @@ export async function createDeliverable(
     action: AuditActions.DELIVERABLE_CREATE,
     entityType: 'DeliverablePlaceholder',
     entityId: deliverable.id,
-    actorId: input.ownerId,
+    actorId: input.actorId,
     detail: {
       code: deliverable.code,
       phase: deliverable.phase,
@@ -187,7 +192,7 @@ export interface CreateFileRevisionInput {
   mimeType?: string
   fileSizeBytes?: number | null
   changeSummary?: string
-  uploadedById?: string | null
+  uploadedById: string
   changeRequestId?: string | null
   revisionNumber?: number
 }
@@ -195,7 +200,7 @@ export interface CreateFileRevisionInput {
 export interface UploadFileRevisionInput {
   deliverableId: string
   file: File
-  uploadedById?: string | null
+  uploadedById: string
   changeRequestId?: string | null
   changeSummary?: string
   revisionNumber?: number
@@ -217,6 +222,10 @@ export async function createFileRevision(
 ): Promise<CreateFileRevisionResult> {
   const fileName = input.fileName.trim()
   const storagePath = input.storagePath.trim()
+
+  if (!input.uploadedById) {
+    throw new Error('必須提供操作者 ID (uploadedById)。')
+  }
 
   if (!fileName) {
     throw new Error('File name is required.')
@@ -409,7 +418,7 @@ export async function createUploadedFileRevision(
 export interface UpdateDeliverableStatusInput {
   deliverableId: string
   status: DeliverableStatus
-  actedById?: string | null
+  actedById: string
   comment?: string
 }
 
@@ -426,6 +435,10 @@ export interface UpdateDeliverableStatusResult {
 export async function updateDeliverableStatus(
   input: UpdateDeliverableStatusInput,
 ): Promise<UpdateDeliverableStatusResult> {
+  if (!input.actedById) {
+    throw new Error('必須提供操作者 ID (actedById)。')
+  }
+
   const existing = await prisma.deliverablePlaceholder.findUnique({
     where: { id: input.deliverableId },
     select: {

@@ -9,7 +9,7 @@ import {
   SectionCard,
   StatusPill,
 } from '@/components/app-shell'
-import { getProjectSummaries } from '@/lib/frontend-data'
+import { getProjectSummaries, getWorkspaceLookupData } from '@/lib/frontend-data'
 import {
   formatDateTimeZh,
   formatDeliverableStatus,
@@ -58,7 +58,11 @@ export default async function PendingItemsPage({
 }: {
   searchParams: SearchParams
 }) {
-  const [params, projects] = await Promise.all([searchParams, getProjectSummaries()])
+  const [params, projects, lookup] = await Promise.all([
+    searchParams,
+    getProjectSummaries(),
+    getWorkspaceLookupData(),
+  ])
   const projectId = params.projectId?.trim() ?? ''
   const status = parseStatus(params.status)
   const notice = params.notice
@@ -72,9 +76,13 @@ export default async function PendingItemsPage({
     const pendingItemId = String(formData.get('pendingItemId') ?? '')
     const formProjectId = String(formData.get('projectId') ?? '')
     const formStatus = String(formData.get('status') ?? '')
+    const actorId = String(formData.get('actorId') ?? '')
 
     try {
-      await resolvePendingItem(pendingItemId)
+      if (!actorId) {
+        throw new Error('請選擇操作者。')
+      }
+      await resolvePendingItem(pendingItemId, actorId)
       redirect(
         buildPageUrl({
           projectId: formProjectId,
@@ -264,8 +272,8 @@ export default async function PendingItemsPage({
                             </div>
                             <div>
                               來源關卡：{' '}
-                              {item.sourceTransition
-                                ? `${formatProjectPhase(item.sourceTransition.fromPhase)} → ${formatProjectPhase(item.sourceTransition.toPhase)}`
+                              {item.sourceOverride?.transition
+                                ? `${formatProjectPhase(item.sourceOverride.transition.fromPhase)} → ${formatProjectPhase(item.sourceOverride.transition.toPhase)}`
                                 : '未知'}
                             </div>
                             <div>
@@ -278,6 +286,19 @@ export default async function PendingItemsPage({
                           <input type="hidden" name="pendingItemId" value={item.id} />
                           <input type="hidden" name="projectId" value={projectId} />
                           <input type="hidden" name="status" value={status ?? ''} />
+                          <select
+                            name="actorId"
+                            defaultValue=""
+                            style={{ ...inputStyle, marginBottom: 10, width: '100%' }}
+                            required
+                          >
+                            <option value="">選擇結案負責人</option>
+                            {lookup.users.map((user) => (
+                              <option key={user.id} value={user.id}>
+                                {user.name} ({user.role})
+                              </option>
+                            ))}
+                          </select>
                           <button
                             type="submit"
                             disabled={!canResolve}

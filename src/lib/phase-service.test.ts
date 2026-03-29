@@ -72,4 +72,42 @@ describe('phase-service', () => {
     })
     expect(syncPendingItemsMock).toHaveBeenCalledWith('project-1')
   })
+
+  it('enforces hard gate correctly when entering PostMarket', async () => {
+    prismaMock.project.findUnique.mockResolvedValue({
+      id: 'project-1',
+      code: 'P-001',
+      currentPhase: ProjectPhase.DesignTransfer,
+    })
+    
+    // Simulate some unfinished deliverable across all prior phases
+    prismaMock.deliverablePlaceholder.findMany.mockResolvedValue([
+      {
+        id: 'del-1',
+        code: 'DI-001', // From earlier phase
+        title: 'Design Input Package',
+        status: DeliverableStatus.Draft,
+        phase: ProjectPhase.DesignInput,
+      },
+    ])
+    
+    // Hard gates also check pending items
+    prismaMock.pendingItem.findMany.mockResolvedValue([])
+
+    const result = await evaluatePhaseGate('project-1')
+
+    expect(result).toEqual({
+      canAdvance: false,
+      isHardGate: true,
+      issues: [
+        {
+          currentStatus: DeliverableStatus.Draft,
+          deliverableCode: 'DI-001',
+          deliverableId: 'del-1',
+          deliverableTitle: 'Design Input Package',
+          reason: '文件尚在草稿狀態，未完成',
+        },
+      ],
+    })
+  })
 })

@@ -106,6 +106,9 @@ export async function getAppDashboardData() {
         project: {
           select: { code: true, name: true },
         },
+        overrideDecision: {
+          select: { id: true }
+        }
       },
     }),
   ])
@@ -255,6 +258,13 @@ export async function getProjectDetail(projectId: string) {
           triggeredBy: {
             select: { name: true },
           },
+          overrideDecision: {
+            include: {
+              approver: {
+                select: { name: true }
+              }
+            }
+          }
         },
         orderBy: { createdAt: 'desc' },
       },

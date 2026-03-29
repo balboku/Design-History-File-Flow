@@ -40,23 +40,33 @@ async function ensurePhaseTransition(input: {
       projectId: input.projectId,
       fromPhase: input.fromPhase,
       toPhase: input.toPhase,
-      wasOverride: input.wasOverride ?? false,
     },
+    include: { overrideDecision: true }
   })
 
   if (existing) {
     return existing
   }
 
+  const data: any = {
+    projectId: input.projectId,
+    fromPhase: input.fromPhase,
+    toPhase: input.toPhase,
+    triggeredById: input.triggeredById ?? null,
+  }
+
+  if (input.wasOverride) {
+    data.overrideDecision = {
+      create: {
+        approverId: input.triggeredById ?? null,
+        rationale: input.overrideReason ?? null,
+      }
+    }
+  }
+
   return prisma.phaseTransition.create({
-    data: {
-      projectId: input.projectId,
-      fromPhase: input.fromPhase,
-      toPhase: input.toPhase,
-      triggeredById: input.triggeredById ?? null,
-      wasOverride: input.wasOverride ?? false,
-      overrideReason: input.overrideReason ?? null,
-    },
+    data,
+    include: { overrideDecision: true }
   })
 }
 
@@ -603,12 +613,12 @@ async function main() {
       detail: 'Soft-gate override created this action item; it must close before design transfer.',
       status: PendingItemStatus.Open,
       resolvedAt: null,
-      sourceTransitionId: betaTransition.id,
+      sourceOverrideId: betaTransition.overrideDecision?.id ?? null,
     },
     create: {
       projectId: beta.id,
       deliverableId: betaVerification.id,
-      sourceTransitionId: betaTransition.id,
+      sourceOverrideId: betaTransition.overrideDecision?.id ?? null,
       title: 'Complete late verification report',
       detail: 'Soft-gate override created this action item; it must close before design transfer.',
       status: PendingItemStatus.Open,

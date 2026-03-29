@@ -14,6 +14,7 @@ import {
   createDeliverableAction,
   updateDeliverableStatusAction,
 } from '@/actions/deliverable-actions'
+import { PHASE_ORDER } from '@/lib/phase-service'
 import {
   ActionLink,
   AppShell,
@@ -69,11 +70,9 @@ export default async function ProjectDetailPage({
   searchParams: SearchParams
 }) {
   const { projectId } = await params
-  const [urlState, data, lookup] = await Promise.all([
-    searchParams,
-    getProjectDetail(projectId),
-    getWorkspaceLookupData(),
-  ])
+  const urlState = await searchParams
+  const data = await getProjectDetail(projectId)
+  const lookup = await getWorkspaceLookupData()
 
   if (!data) {
     return (
@@ -148,7 +147,7 @@ export default async function ProjectDetailPage({
     const result = await advancePhaseAction({
       projectId,
       forceOverride,
-      triggeredById: forceOverride ? undefined : triggeredById,
+      triggeredById,
       overriddenById: forceOverride
         ? String(formData.get('overriddenById') ?? '') || undefined
         : undefined,
@@ -175,6 +174,7 @@ export default async function ProjectDetailPage({
       phase: String(formData.get('phase') ?? project.currentPhase) as ProjectPhase,
       ownerId: String(formData.get('ownerId') ?? '') || undefined,
       isRequired: formData.get('isRequired') === 'true',
+      actorId: String(formData.get('actorId') ?? ''),
     })
 
     if (result.success) {
@@ -190,7 +190,7 @@ export default async function ProjectDetailPage({
     const result = await updateDeliverableStatusAction({
       deliverableId: String(formData.get('deliverableId') ?? ''),
       status: String(formData.get('status') ?? DeliverableStatus.Draft) as DeliverableStatus,
-      actedById: String(formData.get('actedById') ?? '') || undefined,
+      actedById: String(formData.get('actedById') ?? ''),
       comment: String(formData.get('comment') ?? '') || undefined,
     })
 
@@ -207,7 +207,9 @@ export default async function ProjectDetailPage({
 
   const doneTasks = project.tasks.filter((task) => task.status === 'Done').length
   const atRiskTasks = project.tasks.filter(
-    (task) => task.plannedPhase !== project.currentPhase && task.status !== 'Done',
+    (task) =>
+      PHASE_ORDER.indexOf(task.plannedPhase) > PHASE_ORDER.indexOf(project.currentPhase) &&
+      task.status !== 'Done',
   ).length
   const releasedDeliverables = project.deliverables.filter(
     (deliverable) => deliverable.status === 'Released',
@@ -534,6 +536,14 @@ export default async function ProjectDetailPage({
                 </option>
               ))}
             </select>
+            <select name="actorId" defaultValue="" style={inputStyleDark}>
+              <option value="">操作者 (建立人)</option>
+              {lookup.users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name} · {formatRole(user.role)}
+                </option>
+              ))}
+            </select>
             <label style={{ display: 'flex', gap: 10, alignItems: 'center', color: '#fff7ec' }}>
               <input type="checkbox" name="isRequired" value="true" defaultChecked />
               納入關卡審查
@@ -845,8 +855,8 @@ export default async function ProjectDetailPage({
                     {formatProjectPhase(transition.toPhase)}
                   </strong>
                   <StatusPill
-                    label={transition.wasOverride ? '條件式放行' : '正常推進'}
-                    tone={transition.wasOverride ? 'warn' : 'good'}
+                    label={transition.overrideDecision ? '條件式放行' : '正常推進'}
+                    tone={transition.overrideDecision ? 'warn' : 'good'}
                   />
                 </div>
                 <div style={{ marginTop: 8, color: '#5f4a34' }}>

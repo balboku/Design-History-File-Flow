@@ -172,8 +172,8 @@ export default async function HomePage() {
                   </div>
                 </div>
                 <StatusPill
-                  label={transition.wasOverride ? '條件式放行' : '正常推進'}
-                  tone={transition.wasOverride ? 'warn' : 'good'}
+                  label={transition.overrideDecision ? '條件式放行' : '正常推進'}
+                  tone={transition.overrideDecision ? 'warn' : 'good'}
                 />
                 <div style={{ color: 'var(--app-text-soft)', fontSize: 13 }}>
                   {formatDateTimeZh(transition.createdAt)}

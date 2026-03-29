@@ -16,6 +16,7 @@ export interface CreateDeliverableActionInput {
   phase: ProjectPhase
   ownerId?: string | null
   isRequired?: boolean
+  actorId: string
 }
 
 export type CreateDeliverableActionResult = {
@@ -47,7 +48,7 @@ export interface CreateFileRevisionActionInput {
   mimeType?: string
   fileSizeBytes?: number | null
   changeSummary?: string
-  uploadedById?: string | null
+  uploadedById: string
   changeRequestId?: string | null
   revisionNumber?: number
 }
@@ -77,7 +78,7 @@ export async function createFileRevisionAction(
 export interface UpdateDeliverableStatusActionInput {
   deliverableId: string
   status: DeliverableStatus
-  actedById?: string | null
+  actedById: string
   comment?: string
 }
 

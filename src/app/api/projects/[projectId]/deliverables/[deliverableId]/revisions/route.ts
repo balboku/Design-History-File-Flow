@@ -47,7 +47,7 @@ export async function POST(
     const result = await createUploadedFileRevision({
       deliverableId,
       file,
-      uploadedById: String(formData.get('uploadedById') ?? '') || undefined,
+      uploadedById: String(formData.get('uploadedById') ?? ''),
       changeRequestId: String(formData.get('changeRequestId') ?? '') || undefined,
       changeSummary: String(formData.get('changeSummary') ?? '') || undefined,
       revisionNumber: revisionNumber ? Number(revisionNumber) : undefined,

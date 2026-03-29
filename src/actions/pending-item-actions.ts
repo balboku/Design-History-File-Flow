@@ -40,9 +40,10 @@ export type ResolvePendingItemActionResult = {
 
 export async function resolvePendingItemAction(
   pendingItemId: string,
+  actorId: string,
 ): Promise<ResolvePendingItemActionResult> {
   try {
-    const item = await resolvePendingItem(pendingItemId)
+    const item = await resolvePendingItem(pendingItemId, actorId)
     return { success: true, data: item }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

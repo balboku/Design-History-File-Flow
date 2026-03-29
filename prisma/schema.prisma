@@ -60,81 +60,93 @@ enum PendingItemStatus {
 }
 
 model User {
-  id                  String                   @id @default(cuid())
-  email               String                   @unique
-  name                String
-  role                Role
-  createdAt           DateTime                 @default(now())
-  updatedAt           DateTime                 @updatedAt
-  assignedTasks       Task[]                   @relation("TaskAssignee")
-  createdTasks        Task[]                   @relation("TaskCreator")
-  ownedProjects       Project[]                @relation("ProjectOwner")
-  qaOwnedDeliverables DeliverablePlaceholder[] @relation("DeliverableOwner")
-  uploadedRevisions   FileRevision[]           @relation("RevisionUploader")
-  requestedChanges    ChangeRequest[]          @relation("ChangeRequester")
-  approvedChanges     ChangeRequest[]          @relation("ChangeApprover")
-  triggeredPhaseTransitions PhaseTransition[] @relation("PhaseTransitionTriggeredBy")
-  approvals           Approval[]               @relation("ApprovalActor")
-  auditLogs           AuditLog[]               @relation("AuditActor")
+  id                        String                   @id @default(cuid())
+  email                     String                   @unique
+  name                      String
+  role                      Role
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+  assignedTasks             Task[]                   @relation("TaskAssignee")
+  createdTasks              Task[]                   @relation("TaskCreator")
+  ownedProjects             Project[]                @relation("ProjectOwner")
+  qaOwnedDeliverables       DeliverablePlaceholder[] @relation("DeliverableOwner")
+  uploadedRevisions         FileRevision[]           @relation("RevisionUploader")
+  requestedChanges          ChangeRequest[]          @relation("ChangeRequester")
+  approvedChanges           ChangeRequest[]          @relation("ChangeApprover")
+  triggeredPhaseTransitions PhaseTransition[]        @relation("PhaseTransitionTriggeredBy")
+  approvals                 Approval[]               @relation("ApprovalActor")
+  auditLogs                 AuditLog[]               @relation("AuditActor")
+  approvedOverrides         OverrideDecision[]       @relation("OverrideApprover")
 }
 
 model Project {
-  id             String                   @id @default(cuid())
-  code           String                   @unique
-  name           String
-  description    String?
-  currentPhase   ProjectPhase             @default(Concept)
-  previousPhase  ProjectPhase?
-  ownerId        String?
-  createdAt      DateTime                 @default(now())
-  updatedAt      DateTime                 @updatedAt
-  owner          User?                    @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  tasks          Task[]
-  deliverables   DeliverablePlaceholder[]
-  pendingItems   PendingItem[]
+  id               String                   @id @default(cuid())
+  code             String                   @unique
+  name             String
+  description      String?
+  currentPhase     ProjectPhase             @default(Concept)
+  previousPhase    ProjectPhase?
+  ownerId          String?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  owner            User?                    @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  tasks            Task[]
+  deliverables     DeliverablePlaceholder[]
+  pendingItems     PendingItem[]
   phaseTransitions PhaseTransition[]
-  changeRequests ChangeRequest[]
+  changeRequests   ChangeRequest[]
 
   @@index([currentPhase])
   @@index([ownerId])
 }
 
 model PhaseTransition {
-  id              String      @id @default(cuid())
-  projectId       String
-  fromPhase       ProjectPhase
-  toPhase         ProjectPhase
-  triggeredById   String?
-  triggeredBy     User?       @relation("PhaseTransitionTriggeredBy", fields: [triggeredById], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  wasOverride     Boolean     @default(false)
-  overrideReason  String?
-  createdAt       DateTime    @default(now())
-  project         Project     @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  pendingItems    PendingItem[]
+  id               String            @id @default(cuid())
+  projectId        String
+  fromPhase        ProjectPhase
+  toPhase          ProjectPhase
+  triggeredById    String?
+  triggeredBy      User?             @relation("PhaseTransitionTriggeredBy", fields: [triggeredById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  createdAt        DateTime          @default(now())
+  project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  overrideDecision OverrideDecision?
 
   @@index([projectId])
   @@index([triggeredById])
 }
 
+model OverrideDecision {
+  id           String          @id @default(cuid())
+  transitionId String          @unique
+  approverId   String?
+  rationale    String?
+  createdAt    DateTime        @default(now())
+  transition   PhaseTransition @relation(fields: [transitionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  approver     User?           @relation("OverrideApprover", fields: [approverId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  pendingItems PendingItem[]
+
+  @@index([approverId])
+}
+
 model DeliverablePlaceholder {
-  id             String            @id @default(cuid())
-  projectId      String
-  ownerId        String?
-  code           String
-  title          String
-  description    String?
-  phase          ProjectPhase
-  isRequired     Boolean           @default(true)
-  status         DeliverableStatus @default(Draft)
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  lockedAt       DateTime?
-  project        Project           @relation(fields: [projectId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  owner          User?             @relation("DeliverableOwner", fields: [ownerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  taskLinks      TaskDeliverable[]
-  fileRevisions  FileRevision[]
-  approvals      Approval[]
-  pendingItems   PendingItem[]
+  id                 String                     @id @default(cuid())
+  projectId          String
+  ownerId            String?
+  code               String
+  title              String
+  description        String?
+  phase              ProjectPhase
+  isRequired         Boolean                    @default(true)
+  status             DeliverableStatus          @default(Draft)
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+  lockedAt           DateTime?
+  project            Project                    @relation(fields: [projectId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  owner              User?                      @relation("DeliverableOwner", fields: [ownerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  taskLinks          TaskDeliverable[]
+  fileRevisions      FileRevision[]
+  approvals          Approval[]
+  pendingItems       PendingItem[]
   changeRequestLinks ChangeRequestDeliverable[]
 
   @@unique([projectId, code])
@@ -143,24 +155,24 @@ model DeliverablePlaceholder {
 }
 
 model PendingItem {
-  id                String                 @id @default(cuid())
-  projectId         String
-  deliverableId     String
-  sourceTransitionId String?
-  title             String
-  detail            String?
-  status            PendingItemStatus      @default(Open)
-  createdAt         DateTime               @default(now())
-  updatedAt         DateTime               @updatedAt
-  resolvedAt        DateTime?
-  project           Project                @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  deliverable       DeliverablePlaceholder @relation(fields: [deliverableId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  sourceTransition  PhaseTransition?       @relation(fields: [sourceTransitionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  id               String                 @id @default(cuid())
+  projectId        String
+  deliverableId    String
+  sourceOverrideId String?
+  title            String
+  detail           String?
+  status           PendingItemStatus      @default(Open)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  resolvedAt       DateTime?
+  project          Project                @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  deliverable      DeliverablePlaceholder @relation(fields: [deliverableId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  sourceOverride   OverrideDecision?      @relation(fields: [sourceOverrideId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@unique([projectId, deliverableId])
   @@index([projectId, status])
   @@index([deliverableId])
-  @@index([sourceTransitionId])
+  @@index([sourceOverrideId])
 }
 
 /// Application invariant: every Task must have at least one TaskDeliverable row.
@@ -225,65 +237,69 @@ model FileRevision {
 }
 
 model PartComponent {
-  id             String          @id @default(cuid())
-  partNumber     String          @unique
+  id             String                       @id @default(cuid())
+  partNumber     String                       @unique
   name           String
   description    String?
   manufacturer   String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
   changeRequests ChangeRequestPartComponent[]
 
   @@index([name])
 }
 
-/** Tags a DeliverablePlaceholder to a ChangeRequest. One CR can tag many deliverables. */
+/**
+ * Tags a DeliverablePlaceholder to a ChangeRequest. One CR can tag many deliverables.
+ */
 model ChangeRequestDeliverable {
-  id                 String                 @id @default(cuid())
-  changeRequestId    String
-  deliverableId      String
-  createdAt          DateTime              @default(now())
-  changeRequest      ChangeRequest         @relation(fields: [changeRequestId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  deliverable        DeliverablePlaceholder @relation(fields: [deliverableId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  id              String                 @id @default(cuid())
+  changeRequestId String
+  deliverableId   String
+  createdAt       DateTime               @default(now())
+  changeRequest   ChangeRequest          @relation(fields: [changeRequestId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  deliverable     DeliverablePlaceholder @relation(fields: [deliverableId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@unique([changeRequestId, deliverableId])
   @@index([deliverableId])
 }
 
-/** Tags a PartComponent to a ChangeRequest. One CR can tag many part numbers. */
+/**
+ * Tags a PartComponent to a ChangeRequest. One CR can tag many part numbers.
+ */
 model ChangeRequestPartComponent {
-  id                 String         @id @default(cuid())
-  changeRequestId    String
-  partComponentId    String
-  createdAt          DateTime       @default(now())
-  changeRequest      ChangeRequest  @relation(fields: [changeRequestId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  partComponent      PartComponent  @relation(fields: [partComponentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  id              String        @id @default(cuid())
+  changeRequestId String
+  partComponentId String
+  createdAt       DateTime      @default(now())
+  changeRequest   ChangeRequest @relation(fields: [changeRequestId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  partComponent   PartComponent @relation(fields: [partComponentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@unique([changeRequestId, partComponentId])
   @@index([partComponentId])
 }
 
 model ChangeRequest {
-  id              String                  @id @default(cuid())
-  projectId       String?
-  code            String                  @unique
-  title           String
-  description     String?
-  status          ChangeRequestStatus     @default(Draft)
-  requesterId     String?
-  approverId     String?
-  submittedAt     DateTime?
-  approvedAt     DateTime?
-  implementedAt  DateTime?
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
-  project         Project?                @relation(fields: [projectId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  requester       User?                   @relation("ChangeRequester", fields: [requesterId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  approver        User?                   @relation("ChangeApprover", fields: [approverId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  impactAnalysis  ImpactAnalysis?
+  id               String                       @id @default(cuid())
+  projectId        String?
+  code             String                       @unique
+  title            String
+  description      String?
+  status           ChangeRequestStatus          @default(Draft)
+  requesterId      String?
+  approverId       String?
+  submittedAt      DateTime?
+  approvedAt       DateTime?
+  implementedAt    DateTime?
+  createdAt        DateTime                     @default(now())
+  updatedAt        DateTime                     @updatedAt
+  project          Project?                     @relation(fields: [projectId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  requester        User?                        @relation("ChangeRequester", fields: [requesterId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  approver         User?                        @relation("ChangeApprover", fields: [approverId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  impactAnalysis   ImpactAnalysis?
   deliverableLinks ChangeRequestDeliverable[]
-  partLinks       ChangeRequestPartComponent[]
-  fileRevisions   FileRevision[]
+  partLinks        ChangeRequestPartComponent[]
+  fileRevisions    FileRevision[]
 
   @@index([status])
   @@index([projectId])
@@ -292,8 +308,8 @@ model ChangeRequest {
 }
 
 model ImpactAnalysis {
-  id                  String         @id @default(cuid())
-  changeRequestId     String         @unique
+  id                  String        @id @default(cuid())
+  changeRequestId     String        @unique
   summary             String
   regulatoryImpact    String?
   productRiskImpact   String?
@@ -301,22 +317,22 @@ model ImpactAnalysis {
   validationImpact    String?
   manufacturingImpact String?
   documentationImpact String?
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
-  changeRequest       ChangeRequest  @relation(fields: [changeRequestId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  changeRequest       ChangeRequest @relation(fields: [changeRequestId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 }
 
 model Approval {
-  id            String            @id @default(cuid())
-  deliverableId String
+  id             String                 @id @default(cuid())
+  deliverableId  String
   fileRevisionId String?
-  actorId       String?
-  decision      ApprovalDecision
-  comment       String?
-  createdAt     DateTime          @default(now())
-  deliverable   DeliverablePlaceholder @relation(fields: [deliverableId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  fileRevision  FileRevision?     @relation(fields: [fileRevisionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  actor         User?             @relation("ApprovalActor", fields: [actorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  actorId        String?
+  decision       ApprovalDecision
+  comment        String?
+  createdAt      DateTime               @default(now())
+  deliverable    DeliverablePlaceholder @relation(fields: [deliverableId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  fileRevision   FileRevision?          @relation(fields: [fileRevisionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  actor          User?                  @relation("ApprovalActor", fields: [actorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([deliverableId, createdAt])
   @@index([fileRevisionId])
@@ -324,14 +340,14 @@ model Approval {
 }
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  action      String
-  entityType  String
-  entityId    String
-  actorId     String?
-  detail      String?
-  createdAt   DateTime @default(now())
-  actor       User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  id         String   @id @default(cuid())
+  action     String
+  entityType String
+  entityId   String
+  actorId    String?
+  detail     String?
+  createdAt  DateTime @default(now())
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([entityType, entityId])
   @@index([actorId])

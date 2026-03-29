@@ -58,4 +58,6 @@ export const AuditActions = {
   PENDING_ITEM_RESOLVE: 'pendingItem.resolve',
   CHANGE_REQUEST_CREATE: 'changeRequest.create',
   CHANGE_REQUEST_TRANSITION: 'changeRequest.transition',
+  PENDING_ITEM_AUTO_RESOLVE: 'pendingItem.autoResolve',
+  PENDING_ITEM_AUTO_REOPEN: 'pendingItem.autoReopen',
 } as const

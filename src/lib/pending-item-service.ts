@@ -9,7 +9,7 @@ export interface PendingItemSummary {
   id: string
   projectId: string
   deliverableId: string
-  sourceTransitionId: string | null
+  sourceOverrideId: string | null
   title: string
   detail: string | null
   status: PendingItemStatus
@@ -23,12 +23,13 @@ export interface PendingItemSummary {
     phase: string
     status: DeliverableStatus
   }
-  sourceTransition: {
+  sourceOverride: {
     id: string
-    fromPhase: string
-    toPhase: string
-    wasOverride: boolean
-    createdAt: Date
+    transition: {
+      fromPhase: string
+      toPhase: string
+      createdAt: Date
+    }
   } | null
 }
 
@@ -44,40 +45,62 @@ export async function syncPendingItems(projectId: string): Promise<void> {
     },
   })
 
-  const toResolve = pendingItems
-    .filter(
-      (item) =>
-        item.status === PendingItemStatus.Open &&
-        item.deliverable.status === DeliverableStatus.Released,
-    )
-    .map((item) => item.id)
+  const toResolve = pendingItems.filter(
+    (item) =>
+      item.status === PendingItemStatus.Open &&
+      item.deliverable.status === DeliverableStatus.Released,
+  )
 
-  const toReopen = pendingItems
-    .filter(
-      (item) =>
-        item.status === PendingItemStatus.Resolved &&
-        item.deliverable.status !== DeliverableStatus.Released,
-    )
-    .map((item) => item.id)
+  const toReopen = pendingItems.filter(
+    (item) =>
+      item.status === PendingItemStatus.Resolved &&
+      item.deliverable.status !== DeliverableStatus.Released,
+  )
 
   if (toResolve.length > 0) {
     await prisma.pendingItem.updateMany({
-      where: { id: { in: toResolve } },
+      where: { id: { in: toResolve.map((i) => i.id) } },
       data: {
         status: PendingItemStatus.Resolved,
         resolvedAt: new Date(),
       },
     })
+    
+    for (const item of toResolve) {
+      await recordAudit({
+        action: AuditActions.PENDING_ITEM_AUTO_RESOLVE,
+        entityType: 'PendingItem',
+        entityId: item.id,
+        detail: {
+          title: item.title,
+          deliverableId: item.deliverableId,
+          reason: 'Deliverable was Release -> Auto Resolved',
+        },
+      })
+    }
   }
 
   if (toReopen.length > 0) {
     await prisma.pendingItem.updateMany({
-      where: { id: { in: toReopen } },
+      where: { id: { in: toReopen.map((i) => i.id) } },
       data: {
         status: PendingItemStatus.Open,
         resolvedAt: null,
       },
     })
+    
+    for (const item of toReopen) {
+      await recordAudit({
+        action: AuditActions.PENDING_ITEM_AUTO_REOPEN,
+        entityType: 'PendingItem',
+        entityId: item.id,
+        detail: {
+          title: item.title,
+          deliverableId: item.deliverableId,
+          reason: 'Deliverable was Revoked/Modified -> Auto Reopened',
+        },
+      })
+    }
   }
 }
 
@@ -102,13 +125,16 @@ export async function listProjectPendingItems(
           status: true,
         },
       },
-      sourceTransition: {
+      sourceOverride: {
         select: {
           id: true,
-          fromPhase: true,
-          toPhase: true,
-          wasOverride: true,
-          createdAt: true,
+          transition: {
+            select: {
+              fromPhase: true,
+              toPhase: true,
+              createdAt: true,
+            }
+          }
         },
       },
     },
@@ -120,6 +146,7 @@ export async function listProjectPendingItems(
 
 export async function resolvePendingItem(
   pendingItemId: string,
+  actorId: string,
 ): Promise<PendingItemSummary> {
   const item = await prisma.pendingItem.findUnique({
     where: { id: pendingItemId },
@@ -133,13 +160,16 @@ export async function resolvePendingItem(
           status: true,
         },
       },
-      sourceTransition: {
+      sourceOverride: {
         select: {
           id: true,
-          fromPhase: true,
-          toPhase: true,
-          wasOverride: true,
-          createdAt: true,
+          transition: {
+            select: {
+              fromPhase: true,
+              toPhase: true,
+              createdAt: true,
+            }
+          }
         },
       },
     },
@@ -169,13 +199,16 @@ export async function resolvePendingItem(
           status: true,
         },
       },
-      sourceTransition: {
+      sourceOverride: {
         select: {
           id: true,
-          fromPhase: true,
-          toPhase: true,
-          wasOverride: true,
-          createdAt: true,
+          transition: {
+            select: {
+              fromPhase: true,
+              toPhase: true,
+              createdAt: true,
+            }
+          }
         },
       },
     },
@@ -185,6 +218,7 @@ export async function resolvePendingItem(
     action: AuditActions.PENDING_ITEM_RESOLVE,
     entityType: 'PendingItem',
     entityId: resolved.id,
+    actorId,
     detail: {
       title: resolved.title,
       deliverableId: resolved.deliverableId,
