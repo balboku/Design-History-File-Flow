@@ -4,6 +4,7 @@ import { ChangeRequestStatus } from '@prisma/client'
 
 import {
   createChangeRequest,
+  ImpactAnalysisInput,
   transitionChangeRequest,
 } from '@/lib/change-request-service'
 
@@ -11,7 +12,7 @@ export interface CreateChangeRequestActionInput {
   code: string
   title: string
   description?: string
-  impactAnalysis?: string
+  impactAnalysis?: ImpactAnalysisInput
   projectId?: string | null
   requesterId?: string | null
   deliverableIds?: string[]

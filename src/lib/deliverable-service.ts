@@ -1,4 +1,9 @@
-import { ChangeRequestStatus, DeliverableStatus, ProjectPhase } from '@prisma/client'
+import {
+  ApprovalDecision,
+  ChangeRequestStatus,
+  DeliverableStatus,
+  ProjectPhase,
+} from '@prisma/client'
 
 import { recordAudit, AuditActions } from './audit-log-service'
 import { syncPendingItems } from './pending-item-service'
@@ -12,8 +17,14 @@ export const LOCKED_DELIVERABLE_STATUS_CHANGE_ERROR =
   'Locked deliverables cannot be directly unlocked. Create a Change Request and upload a new revision instead.'
 export const LOCKED_DELIVERABLE_APPROVED_CHANGE_REQUEST_ERROR =
   'Locked deliverables require an approved Change Request before a new revision can be uploaded.'
+export const LOCKED_DELIVERABLE_CHANGE_REQUEST_LINK_ERROR =
+  'The linked Change Request must explicitly reference this deliverable before a new revision can be uploaded.'
 export const INVALID_STATUS_TRANSITION_ERROR =
   'Invalid deliverable status transition.'
+export const DELIVERABLE_REVIEW_DECISION_ACTOR_REQUIRED_ERROR =
+  'Review decisions that release or return a deliverable must record the acting QA reviewer.'
+export const DELIVERABLE_RELEASE_REQUIRES_REVISION_ERROR =
+  'Deliverables need at least one uploaded revision before QA can release them.'
 
 /**
  * 合法的狀態轉換路徑。Draft → InReview → Released 為主線。
@@ -252,7 +263,19 @@ export async function createFileRevision(
   if (input.changeRequestId) {
     const request = await prisma.changeRequest.findUnique({
       where: { id: input.changeRequestId },
-      select: { id: true, projectId: true, status: true },
+      select: {
+        id: true,
+        projectId: true,
+        status: true,
+        deliverableLinks: {
+          where: {
+            deliverableId: input.deliverableId,
+          },
+          select: {
+            id: true,
+          },
+        },
+      },
     })
 
     if (!request) {
@@ -261,6 +284,10 @@ export async function createFileRevision(
 
     if (request.projectId && request.projectId !== deliverable.projectId) {
       throw new Error('Linked Change Request does not belong to the same project.')
+    }
+
+    if (request.deliverableLinks.length === 0) {
+      throw new Error(LOCKED_DELIVERABLE_CHANGE_REQUEST_LINK_ERROR)
     }
 
     if (
@@ -382,6 +409,8 @@ export async function createUploadedFileRevision(
 export interface UpdateDeliverableStatusInput {
   deliverableId: string
   status: DeliverableStatus
+  actedById?: string | null
+  comment?: string
 }
 
 export interface UpdateDeliverableStatusResult {
@@ -404,6 +433,15 @@ export async function updateDeliverableStatus(
       projectId: true,
       code: true,
       status: true,
+      fileRevisions: {
+        select: {
+          id: true,
+        },
+        orderBy: {
+          revisionNumber: 'desc',
+        },
+        take: 1,
+      },
     },
   })
 
@@ -424,6 +462,32 @@ export async function updateDeliverableStatus(
     )
   }
 
+  const actedById = input.actedById?.trim() || null
+  const decisionComment = input.comment?.trim() || null
+  const latestRevision = existing.fileRevisions[0] ?? null
+  const isReviewDecision =
+    existing.status === DeliverableStatus.InReview &&
+    (input.status === DeliverableStatus.Released || input.status === DeliverableStatus.Draft)
+
+  if (isReviewDecision && !actedById) {
+    throw new Error(DELIVERABLE_REVIEW_DECISION_ACTOR_REQUIRED_ERROR)
+  }
+
+  if (actedById) {
+    const reviewer = await prisma.user.findUnique({
+      where: { id: actedById },
+      select: { id: true },
+    })
+
+    if (!reviewer) {
+      throw new Error(`Deliverable reviewer not found: ${actedById}`)
+    }
+  }
+
+  if (input.status === DeliverableStatus.Released && !latestRevision) {
+    throw new Error(DELIVERABLE_RELEASE_REQUIRES_REVISION_ERROR)
+  }
+
   const deliverable = await prisma.deliverablePlaceholder.update({
     where: { id: input.deliverableId },
     data: {
@@ -439,14 +503,31 @@ export async function updateDeliverableStatus(
     },
   })
 
+  if (isReviewDecision) {
+    await prisma.approval.create({
+      data: {
+        deliverableId: existing.id,
+        fileRevisionId: latestRevision?.id ?? null,
+        actorId: actedById,
+        decision:
+          input.status === DeliverableStatus.Released
+            ? ApprovalDecision.Approved
+            : ApprovalDecision.Rejected,
+        comment: decisionComment,
+      },
+    })
+  }
+
   await recordAudit({
     action: AuditActions.DELIVERABLE_STATUS_CHANGE,
     entityType: 'DeliverablePlaceholder',
     entityId: deliverable.id,
+    actorId: actedById,
     detail: {
       code: deliverable.code,
       from: existing.status,
       to: deliverable.status,
+      decisionComment,
     },
   })
 

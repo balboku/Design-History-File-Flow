@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import {
   createUploadedFileRevision,
   LOCKED_DELIVERABLE_APPROVED_CHANGE_REQUEST_ERROR,
+  LOCKED_DELIVERABLE_CHANGE_REQUEST_LINK_ERROR,
   FILE_UPLOAD_ERROR,
   LOCKED_DELIVERABLE_CHANGE_REQUEST_ERROR,
 } from '@/lib/deliverable-service'
@@ -63,6 +64,7 @@ export async function POST(
     const safeMessage =
       message === LOCKED_DELIVERABLE_CHANGE_REQUEST_ERROR ||
       message === LOCKED_DELIVERABLE_APPROVED_CHANGE_REQUEST_ERROR ||
+      message === LOCKED_DELIVERABLE_CHANGE_REQUEST_LINK_ERROR ||
       message === FILE_UPLOAD_ERROR
         ? message
         : `Revision upload failed: ${message}`

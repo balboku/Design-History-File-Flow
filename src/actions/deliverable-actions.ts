@@ -77,6 +77,8 @@ export async function createFileRevisionAction(
 export interface UpdateDeliverableStatusActionInput {
   deliverableId: string
   status: DeliverableStatus
+  actedById?: string | null
+  comment?: string
 }
 
 export type UpdateDeliverableStatusActionResult = {

@@ -263,6 +263,17 @@ export async function getProjectDetail(projectId: string) {
           requester: {
             select: { name: true },
           },
+          impactAnalysis: {
+            select: {
+              summary: true,
+              regulatoryImpact: true,
+              productRiskImpact: true,
+              verificationImpact: true,
+              validationImpact: true,
+              manufacturingImpact: true,
+              documentationImpact: true,
+            },
+          },
           deliverableLinks: {
             include: {
               deliverable: {
@@ -425,6 +436,17 @@ export async function getChangeRequestBoardData() {
       approver: {
         select: {
           name: true,
+        },
+      },
+      impactAnalysis: {
+        select: {
+          summary: true,
+          regulatoryImpact: true,
+          productRiskImpact: true,
+          verificationImpact: true,
+          validationImpact: true,
+          manufacturingImpact: true,
+          documentationImpact: true,
         },
       },
       deliverableLinks: {

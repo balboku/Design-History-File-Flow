@@ -20,11 +20,21 @@ export const CHANGE_REQUEST_APPROVAL_ERROR =
 export const CHANGE_REQUEST_WORKFLOW_ERROR =
   'The requested Change Request status transition is not allowed.'
 
+export interface ImpactAnalysisInput {
+  summary: string
+  regulatoryImpact?: string
+  productRiskImpact?: string
+  verificationImpact?: string
+  validationImpact?: string
+  manufacturingImpact?: string
+  documentationImpact?: string
+}
+
 export interface CreateChangeRequestInput {
   code: string
   title: string
   description?: string
-  impactAnalysis?: string
+  impactAnalysis?: ImpactAnalysisInput
   projectId?: string | null
   requesterId?: string | null
   deliverableIds?: string[]
@@ -65,14 +75,27 @@ export function getAllowedChangeRequestTransitions(
   return CHANGE_REQUEST_WORKFLOW[status] ?? []
 }
 
+function trimOptionalText(value?: string): string | null {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
+}
+
 export async function createChangeRequest(
   input: CreateChangeRequestInput,
 ): Promise<CreateChangeRequestResult> {
   const code = input.code.trim()
   const title = input.title.trim()
-  const impactAnalysis = input.impactAnalysis?.trim()
   const deliverableIds = [...new Set(input.deliverableIds ?? [])]
   const partComponentIds = [...new Set(input.partComponentIds ?? [])]
+  const impactAnalysis = {
+    summary: input.impactAnalysis?.summary?.trim() ?? '',
+    regulatoryImpact: trimOptionalText(input.impactAnalysis?.regulatoryImpact),
+    productRiskImpact: trimOptionalText(input.impactAnalysis?.productRiskImpact),
+    verificationImpact: trimOptionalText(input.impactAnalysis?.verificationImpact),
+    validationImpact: trimOptionalText(input.impactAnalysis?.validationImpact),
+    manufacturingImpact: trimOptionalText(input.impactAnalysis?.manufacturingImpact),
+    documentationImpact: trimOptionalText(input.impactAnalysis?.documentationImpact),
+  }
 
   if (!code) {
     throw new Error('Change request code is required.')
@@ -82,7 +105,7 @@ export async function createChangeRequest(
     throw new Error('Change request title is required.')
   }
 
-  if (!impactAnalysis) {
+  if (!impactAnalysis.summary) {
     throw new Error('Impact analysis is required for every change request.')
   }
 
@@ -156,9 +179,19 @@ export async function createChangeRequest(
       code,
       title,
       description: input.description?.trim() || null,
-      impactAnalysis,
       requesterId: input.requesterId ?? null,
       status: ChangeRequestStatus.Draft,
+      impactAnalysis: {
+        create: {
+          summary: impactAnalysis.summary,
+          regulatoryImpact: impactAnalysis.regulatoryImpact,
+          productRiskImpact: impactAnalysis.productRiskImpact,
+          verificationImpact: impactAnalysis.verificationImpact,
+          validationImpact: impactAnalysis.validationImpact,
+          manufacturingImpact: impactAnalysis.manufacturingImpact,
+          documentationImpact: impactAnalysis.documentationImpact,
+        },
+      },
       deliverableLinks: {
         create: deliverableIds.map((deliverableId) => ({
           deliverableId,
@@ -188,6 +221,7 @@ export async function createChangeRequest(
       projectId: resolvedProjectId,
       deliverableIds,
       partComponentIds,
+      impactAnalysisSummary: impactAnalysis.summary,
     },
   })
 

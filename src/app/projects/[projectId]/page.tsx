@@ -190,6 +190,8 @@ export default async function ProjectDetailPage({
     const result = await updateDeliverableStatusAction({
       deliverableId: String(formData.get('deliverableId') ?? ''),
       status: String(formData.get('status') ?? DeliverableStatus.Draft) as DeliverableStatus,
+      actedById: String(formData.get('actedById') ?? '') || undefined,
+      comment: String(formData.get('comment') ?? '') || undefined,
     })
 
     if (result.success) {
@@ -714,6 +716,24 @@ export default async function ProjectDetailPage({
                   <form action={updateDeliverableStatusForm} style={{ display: 'grid', gap: 10 }}>
                     <input type="hidden" name="deliverableId" value={deliverable.id} />
                     <div style={fieldLabelStyle}>QA 狀態控制</div>
+                    {(deliverable.status === DeliverableStatus.Draft ||
+                      deliverable.status === DeliverableStatus.InReview) ? (
+                      <>
+                        <select name="actedById" defaultValue="" style={inputStyle}>
+                          <option value="">QA 審查 / 核准者</option>
+                          {qaUsers.map((user) => (
+                            <option key={user.id} value={user.id}>
+                              {user.name} · {formatRole(user.role)}
+                            </option>
+                          ))}
+                        </select>
+                        <textarea
+                          name="comment"
+                          placeholder="審查備註 / 核准說明"
+                          style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }}
+                        />
+                      </>
+                    ) : null}
                     {deliverable.status === DeliverableStatus.Draft ? (
                       <button
                         type="submit"

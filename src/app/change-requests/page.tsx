@@ -55,7 +55,15 @@ export default async function ChangeRequestsPage({
       code: String(formData.get('code') ?? ''),
       title: String(formData.get('title') ?? ''),
       description: String(formData.get('description') ?? '') || undefined,
-      impactAnalysis: String(formData.get('impactAnalysis') ?? '') || undefined,
+      impactAnalysis: {
+        summary: String(formData.get('impactSummary') ?? ''),
+        regulatoryImpact: String(formData.get('regulatoryImpact') ?? '') || undefined,
+        productRiskImpact: String(formData.get('productRiskImpact') ?? '') || undefined,
+        verificationImpact: String(formData.get('verificationImpact') ?? '') || undefined,
+        validationImpact: String(formData.get('validationImpact') ?? '') || undefined,
+        manufacturingImpact: String(formData.get('manufacturingImpact') ?? '') || undefined,
+        documentationImpact: String(formData.get('documentationImpact') ?? '') || undefined,
+      },
       projectId: String(formData.get('projectId') ?? '') || undefined,
       requesterId: String(formData.get('requesterId') ?? '') || undefined,
       deliverableIds: formData.getAll('deliverableIds').map(String),
@@ -162,10 +170,40 @@ export default async function ChangeRequestsPage({
               style={{ ...darkInputStyle, minHeight: 90, resize: 'vertical' }}
             />
             <textarea
-              name="impactAnalysis"
-              placeholder="影響評估"
+              name="impactSummary"
+              placeholder="影響評估摘要"
               required
               style={{ ...darkInputStyle, minHeight: 120, resize: 'vertical' }}
+            />
+            <textarea
+              name="regulatoryImpact"
+              placeholder="法規影響"
+              style={{ ...darkInputStyle, minHeight: 88, resize: 'vertical' }}
+            />
+            <textarea
+              name="productRiskImpact"
+              placeholder="產品風險影響"
+              style={{ ...darkInputStyle, minHeight: 88, resize: 'vertical' }}
+            />
+            <textarea
+              name="verificationImpact"
+              placeholder="驗證影響"
+              style={{ ...darkInputStyle, minHeight: 88, resize: 'vertical' }}
+            />
+            <textarea
+              name="validationImpact"
+              placeholder="確效影響"
+              style={{ ...darkInputStyle, minHeight: 88, resize: 'vertical' }}
+            />
+            <textarea
+              name="manufacturingImpact"
+              placeholder="製造 / 移轉影響"
+              style={{ ...darkInputStyle, minHeight: 88, resize: 'vertical' }}
+            />
+            <textarea
+              name="documentationImpact"
+              placeholder="文件影響"
+              style={{ ...darkInputStyle, minHeight: 88, resize: 'vertical' }}
             />
             <select name="projectId" defaultValue="" style={darkInputStyle}>
               <option value="">尚未指定專案</option>
@@ -281,13 +319,40 @@ export default async function ChangeRequestsPage({
                     {changeRequest.project ? (
                       <StatusPill label={changeRequest.project.code} tone="neutral" />
                     ) : null}
+                    <StatusPill
+                      label={`影響面向 ${
+                        [
+                          changeRequest.impactAnalysis?.regulatoryImpact,
+                          changeRequest.impactAnalysis?.productRiskImpact,
+                          changeRequest.impactAnalysis?.verificationImpact,
+                          changeRequest.impactAnalysis?.validationImpact,
+                          changeRequest.impactAnalysis?.manufacturingImpact,
+                          changeRequest.impactAnalysis?.documentationImpact,
+                        ].filter(Boolean).length
+                      } / 6`}
+                      tone="neutral"
+                    />
                   </div>
                 </div>
                 <div style={{ color: '#5a4631', lineHeight: 1.6 }}>
                   {changeRequest.description ?? '尚未填寫變更內容。'}
                 </div>
                 <div style={{ marginTop: 8, color: '#5a4631' }}>
-                  影響評估：{changeRequest.impactAnalysis ?? '尚未填寫'}
+                  影響評估摘要：{changeRequest.impactAnalysis?.summary ?? '尚未填寫'}
+                </div>
+                <div style={{ marginTop: 8, color: '#5a4631', lineHeight: 1.7 }}>
+                  影響面向：
+                  {[
+                    ['法規', changeRequest.impactAnalysis?.regulatoryImpact],
+                    ['產品風險', changeRequest.impactAnalysis?.productRiskImpact],
+                    ['驗證', changeRequest.impactAnalysis?.verificationImpact],
+                    ['確效', changeRequest.impactAnalysis?.validationImpact],
+                    ['製造 / 移轉', changeRequest.impactAnalysis?.manufacturingImpact],
+                    ['文件', changeRequest.impactAnalysis?.documentationImpact],
+                  ]
+                    .filter((item) => Boolean(item[1]))
+                    .map((item) => item[0])
+                    .join('、') || '尚未分項填寫'}
                 </div>
                 <div style={{ marginTop: 10, color: '#5a4631' }}>
                   提出人：{changeRequest.requester?.name ?? '尚未指派'} · 影響文件：

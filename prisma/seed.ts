@@ -621,18 +621,46 @@ async function main() {
       projectId: alpha.id,
       title: 'Housing vent geometry update',
       description: 'Adjust enclosure venting to reduce thermal rise during continuous sampling.',
-      impactAnalysis: 'Mechanical drawing pack, BOM notes, and firmware enclosure assumptions require review.',
       status: ChangeRequestStatus.InReview,
       requesterId: qa.id,
+      impactAnalysis: {
+        upsert: {
+          update: {
+            summary: 'Mechanical drawing pack, BOM notes, and firmware enclosure assumptions require review.',
+            regulatoryImpact: 'Design output references and trace links need QA review.',
+            productRiskImpact: 'Enclosure vent geometry may affect temperature and particulate ingress risk.',
+            verificationImpact: 'Thermal verification protocol and acceptance rationale need refresh.',
+            manufacturingImpact: 'Tooling notes and assembly instructions need to reflect the vent change.',
+            documentationImpact: 'Drawing pack, BOM notes, and release checklist need revision.',
+          },
+          create: {
+            summary: 'Mechanical drawing pack, BOM notes, and firmware enclosure assumptions require review.',
+            regulatoryImpact: 'Design output references and trace links need QA review.',
+            productRiskImpact: 'Enclosure vent geometry may affect temperature and particulate ingress risk.',
+            verificationImpact: 'Thermal verification protocol and acceptance rationale need refresh.',
+            manufacturingImpact: 'Tooling notes and assembly instructions need to reflect the vent change.',
+            documentationImpact: 'Drawing pack, BOM notes, and release checklist need revision.',
+          },
+        },
+      },
     },
     create: {
       code: 'CR-ALPHA-001',
       projectId: alpha.id,
       title: 'Housing vent geometry update',
       description: 'Adjust enclosure venting to reduce thermal rise during continuous sampling.',
-      impactAnalysis: 'Mechanical drawing pack, BOM notes, and firmware enclosure assumptions require review.',
       status: ChangeRequestStatus.InReview,
       requesterId: qa.id,
+      impactAnalysis: {
+        create: {
+          summary: 'Mechanical drawing pack, BOM notes, and firmware enclosure assumptions require review.',
+          regulatoryImpact: 'Design output references and trace links need QA review.',
+          productRiskImpact: 'Enclosure vent geometry may affect temperature and particulate ingress risk.',
+          verificationImpact: 'Thermal verification protocol and acceptance rationale need refresh.',
+          manufacturingImpact: 'Tooling notes and assembly instructions need to reflect the vent change.',
+          documentationImpact: 'Drawing pack, BOM notes, and release checklist need revision.',
+        },
+      },
     },
   })
 
@@ -642,22 +670,50 @@ async function main() {
       projectId: beta.id,
       title: 'Controller PCB component alternates',
       description: 'Approve an alternate regulator network for transfer readiness.',
-      impactAnalysis: 'Supplier swap affects PCB assembly notes, verification rationale, and transfer packet attachments.',
       status: ChangeRequestStatus.Approved,
       requesterId: pm.id,
       approverId: admin.id,
       approvedAt: new Date('2026-03-25T08:00:00.000Z'),
+      impactAnalysis: {
+        upsert: {
+          update: {
+            summary: 'Supplier swap affects PCB assembly notes, verification rationale, and transfer packet attachments.',
+            regulatoryImpact: 'Transfer packet references and approved supplier records require update.',
+            productRiskImpact: 'Alternate regulator network needs documented equivalence review.',
+            verificationImpact: 'Verification rationale and any delta evidence must cite the approved alternate.',
+            manufacturingImpact: 'PCB assembly instructions and AVL entries need synchronized release.',
+            documentationImpact: 'Transfer packet attachments and BOM exports need new version references.',
+          },
+          create: {
+            summary: 'Supplier swap affects PCB assembly notes, verification rationale, and transfer packet attachments.',
+            regulatoryImpact: 'Transfer packet references and approved supplier records require update.',
+            productRiskImpact: 'Alternate regulator network needs documented equivalence review.',
+            verificationImpact: 'Verification rationale and any delta evidence must cite the approved alternate.',
+            manufacturingImpact: 'PCB assembly instructions and AVL entries need synchronized release.',
+            documentationImpact: 'Transfer packet attachments and BOM exports need new version references.',
+          },
+        },
+      },
     },
     create: {
       code: 'CR-BETA-001',
       projectId: beta.id,
       title: 'Controller PCB component alternates',
       description: 'Approve an alternate regulator network for transfer readiness.',
-      impactAnalysis: 'Supplier swap affects PCB assembly notes, verification rationale, and transfer packet attachments.',
       status: ChangeRequestStatus.Approved,
       requesterId: pm.id,
       approverId: admin.id,
       approvedAt: new Date('2026-03-25T08:00:00.000Z'),
+      impactAnalysis: {
+        create: {
+          summary: 'Supplier swap affects PCB assembly notes, verification rationale, and transfer packet attachments.',
+          regulatoryImpact: 'Transfer packet references and approved supplier records require update.',
+          productRiskImpact: 'Alternate regulator network needs documented equivalence review.',
+          verificationImpact: 'Verification rationale and any delta evidence must cite the approved alternate.',
+          manufacturingImpact: 'PCB assembly instructions and AVL entries need synchronized release.',
+          documentationImpact: 'Transfer packet attachments and BOM exports need new version references.',
+        },
+      },
     },
   })
 

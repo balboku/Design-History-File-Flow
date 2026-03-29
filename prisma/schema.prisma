@@ -49,6 +49,11 @@ enum ChangeRequestStatus {
   Closed
 }
 
+enum ApprovalDecision {
+  Approved
+  Rejected
+}
+
 enum PendingItemStatus {
   Open
   Resolved
@@ -69,6 +74,7 @@ model User {
   requestedChanges    ChangeRequest[]          @relation("ChangeRequester")
   approvedChanges     ChangeRequest[]          @relation("ChangeApprover")
   triggeredPhaseTransitions PhaseTransition[] @relation("PhaseTransitionTriggeredBy")
+  approvals           Approval[]               @relation("ApprovalActor")
   auditLogs           AuditLog[]               @relation("AuditActor")
 }
 
@@ -127,6 +133,7 @@ model DeliverablePlaceholder {
   owner          User?             @relation("DeliverableOwner", fields: [ownerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   taskLinks      TaskDeliverable[]
   fileRevisions  FileRevision[]
+  approvals      Approval[]
   pendingItems   PendingItem[]
   changeRequestLinks ChangeRequestDeliverable[]
 
@@ -209,6 +216,7 @@ model FileRevision {
   deliverable     DeliverablePlaceholder @relation(fields: [deliverableId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   changeRequest   ChangeRequest?         @relation(fields: [changeRequestId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   uploadedBy      User?                  @relation("RevisionUploader", fields: [uploadedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  approvals       Approval[]
 
   @@unique([deliverableId, revisionNumber])
   @@index([changeRequestId])
@@ -262,7 +270,6 @@ model ChangeRequest {
   title           String
   description     String?
   status          ChangeRequestStatus     @default(Draft)
-  impactAnalysis  String?
   requesterId     String?
   approverId     String?
   submittedAt     DateTime?
@@ -273,6 +280,7 @@ model ChangeRequest {
   project         Project?                @relation(fields: [projectId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   requester       User?                   @relation("ChangeRequester", fields: [requesterId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   approver        User?                   @relation("ChangeApprover", fields: [approverId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  impactAnalysis  ImpactAnalysis?
   deliverableLinks ChangeRequestDeliverable[]
   partLinks       ChangeRequestPartComponent[]
   fileRevisions   FileRevision[]
@@ -281,6 +289,38 @@ model ChangeRequest {
   @@index([projectId])
   @@index([requesterId])
   @@index([approverId])
+}
+
+model ImpactAnalysis {
+  id                  String         @id @default(cuid())
+  changeRequestId     String         @unique
+  summary             String
+  regulatoryImpact    String?
+  productRiskImpact   String?
+  verificationImpact  String?
+  validationImpact    String?
+  manufacturingImpact String?
+  documentationImpact String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  changeRequest       ChangeRequest  @relation(fields: [changeRequestId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model Approval {
+  id            String            @id @default(cuid())
+  deliverableId String
+  fileRevisionId String?
+  actorId       String?
+  decision      ApprovalDecision
+  comment       String?
+  createdAt     DateTime          @default(now())
+  deliverable   DeliverablePlaceholder @relation(fields: [deliverableId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  fileRevision  FileRevision?     @relation(fields: [fileRevisionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  actor         User?             @relation("ApprovalActor", fields: [actorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([deliverableId, createdAt])
+  @@index([fileRevisionId])
+  @@index([actorId])
 }
 
 model AuditLog {
