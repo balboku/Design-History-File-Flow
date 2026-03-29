@@ -11,8 +11,8 @@ export interface EvaluateGateResult {
 } | {
   success: true
   canAdvance: false
-  issues: PhaseGateIssue[]
   isHardGate: boolean
+  issues: PhaseGateIssue[]
 } | {
   success: false
   error: string
@@ -39,62 +39,24 @@ export async function evaluatePhaseGateAction(
 
 export interface AdvancePhaseActionInput {
   projectId: string
-  override?: {
-    overriddenById: string
-    rationale?: string
-  }
+  forceOverride?: boolean
+  overriddenById?: string
+  rationale?: string
 }
 
-export interface AdvancePhaseActionResult {
-  success: true
-  project: {
-    id: string
-    code: string
-    name: string
-    previousPhase: string
-    currentPhase: string
-  }
-  wasOverridden: boolean
-} | {
-  success: false
-  reason: 'blocked' | 'hard_gate' | 'error'
-  message: string
-  issues: PhaseGateIssue[]
-}
+export type AdvancePhaseActionResult = Awaited<ReturnType<typeof advancePhase>>
 
 export async function advancePhaseAction(
   input: AdvancePhaseActionInput,
 ): Promise<AdvancePhaseActionResult> {
   try {
-    const result = await advancePhase(input.projectId, input.override)
-
-    if (result.success) {
-      return {
-        success: true,
-        wasOverridden: result.wasOverridden,
-        project: {
-          id: result.project.id,
-          code: result.project.code,
-          name: result.project.name,
-          previousPhase: result.project.previousPhase,
-          currentPhase: result.project.currentPhase,
-        },
-      }
-    }
-
-    // Gate failed
-    return {
-      success: false,
-      reason: result.reason,
-      message: result.message,
-      issues: result.issues,
-    }
+    return await advancePhase(input.projectId, {
+      forceOverride: input.forceOverride,
+      overriddenById: input.overriddenById,
+      rationale: input.rationale,
+    })
   } catch (err) {
-    return {
-      success: false,
-      reason: 'error',
-      message: err instanceof Error ? err.message : String(err),
-      issues: [],
-    }
+    // Re-throw domain errors as-is; let callers handle them
+    throw err
   }
 }

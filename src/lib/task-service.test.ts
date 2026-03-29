@@ -347,44 +347,46 @@ describe('evaluatePhaseGate', () => {
 // ─── Tests: advancePhase ───────────────────────────────────────────────────────
 
 describe('advancePhase', () => {
-  it('gate 通過時，推進階段成功', async () => {
+  it('gate 通過時，推進階段成功 (outcome: advanced)', async () => {
     const project = await setupProjectWithPhase(ProjectPhase.Planning)
     await setupDeliverableForPhase(project.id, ProjectPhase.Planning, DeliverableStatus.Released)
 
     const result = await advancePhase(project.id)
     expect(result.success).toBe(true)
-    if (result.success) {
+    expect(result.outcome).toBe('advanced')
+    if (result.outcome === 'advanced') {
       expect(result.project.currentPhase).toBe(ProjectPhase.DesignInput)
-      expect(result.wasOverridden).toBe(false)
     }
   })
 
-  it('gate 失敗且無 override 時，回傳 blocked 結果與詳細錯誤清單', async () => {
+  it('gate 失敗且無 forceOverride 時，回傳 warning 結果與詳細錯誤清單', async () => {
     const project = await setupProjectWithPhase(ProjectPhase.Planning)
     await setupDeliverableForPhase(project.id, ProjectPhase.Planning, DeliverableStatus.Released)
     await setupDeliverableForPhase(project.id, ProjectPhase.Planning, DeliverableStatus.Draft)
 
     const result = await advancePhase(project.id)
-    expect(result.success).toBe(false)
-    if (!result.success) {
-      expect(result.reason).toBe('blocked')
+    expect(result.success).toBe(true)
+    expect(result.outcome).toBe('warning')
+    if (result.outcome === 'warning') {
       expect(result.issues.length).toBeGreaterThan(0)
       expect(result.message).toContain('尚未 Released')
     }
   })
 
-  it('soft gate 提供 override 時可繼續推進，並建立 PhaseTransition 審計記錄', async () => {
+  it('forceOverride=true 時可繼續推進，並建立 PhaseTransition 審計記錄 (outcome: forced)', async () => {
     const project = await setupProjectWithPhase(ProjectPhase.Planning)
     await setupDeliverableForPhase(project.id, ProjectPhase.Planning, DeliverableStatus.Draft)
 
     const result = await advancePhase(project.id, {
+      forceOverride: true,
       overriddenById: testUserId,
       rationale: 'Due to schedule pressure',
     })
     expect(result.success).toBe(true)
-    if (result.success) {
+    expect(result.outcome).toBe('forced')
+    if (result.outcome === 'forced') {
       expect(result.project.currentPhase).toBe(ProjectPhase.DesignInput)
-      expect(result.wasOverridden).toBe(true)
+      expect(result.issues.length).toBe(1)
     }
 
     const transitions = await prisma.phaseTransition.findMany({
@@ -399,31 +401,32 @@ describe('advancePhase', () => {
 // ─── Tests: DesignTransfer Hard Gate ─────────────────────────────────────────
 
 describe('DesignTransfer hard gate', () => {
-  it('所有 deliverables 都是 Released 時，可以推進到 DesignTransfer', async () => {
+  it('所有 deliverables 都是 Released 時，可以推進到 DesignTransfer (outcome: advanced)', async () => {
     const project = await setupProjectWithPhase(ProjectPhase.Validation)
     await setupDeliverableForPhase(project.id, ProjectPhase.Validation, DeliverableStatus.Released)
 
     const result = await advancePhase(project.id)
     expect(result.success).toBe(true)
-    if (result.success) {
+    expect(result.outcome).toBe('advanced')
+    if (result.outcome === 'advanced') {
       expect(result.project.currentPhase).toBe(ProjectPhase.DesignTransfer)
     }
   })
 
-  it('有 incomplete deliverables 時，DesignTransfer 回傳 hard_gate 且不接受 override', async () => {
+  it('有 incomplete deliverables 時，即使提供 forceOverride 也回傳 hard_gate 錯誤', async () => {
     const project = await setupProjectWithPhase(ProjectPhase.Validation)
     await setupDeliverableForPhase(project.id, ProjectPhase.Validation, DeliverableStatus.Released)
     await setupDeliverableForPhase(project.id, ProjectPhase.Validation, DeliverableStatus.Draft)
 
+    // forceOverride=true still gets rejected for DesignTransfer hard gate
     const result = await advancePhase(project.id, {
+      forceOverride: true,
       overriddenById: testUserId,
       rationale: 'Should not work',
     })
     expect(result.success).toBe(false)
-    if (!result.success) {
-      expect(result.reason).toBe('hard_gate')
-      expect(result.message).toContain('不接受 Override')
-    }
+    expect(result.reason).toBe('hard_gate')
+    expect(result.message).toContain('不接受 Override')
   })
 
   it('soft gate 只檢查當前 phase 的 deliverables，不受前期 phase 影響', async () => {
@@ -437,7 +440,8 @@ describe('DesignTransfer hard gate', () => {
 
     // Soft gate passes since only current phase deliverables are checked
     expect(result.success).toBe(true)
-    if (result.success) {
+    expect(result.outcome).toBe('advanced')
+    if (result.outcome === 'advanced') {
       expect(result.project.currentPhase).toBe(ProjectPhase.Validation)
     }
   })

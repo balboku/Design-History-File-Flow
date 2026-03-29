@@ -11,8 +11,10 @@ export interface PhaseGateIssue {
   reason: string
 }
 
+/** Advance succeeded without any issues. */
 export interface AdvancePhaseSuccess {
   success: true
+  outcome: 'advanced'
   project: {
     id: string
     code: string
@@ -20,15 +22,50 @@ export interface AdvancePhaseSuccess {
     previousPhase: ProjectPhase
     currentPhase: ProjectPhase
   }
-  wasOverridden: boolean
 }
 
-export interface AdvancePhaseBlocked {
+/**
+ * Gate evaluation found missing deliverables, but the PM chose to force-advance.
+ * The project has moved forward and this override is recorded as an audit event.
+ */
+export interface AdvancePhaseForced {
+  success: true
+  outcome: 'forced'
+  project: {
+    id: string
+    code: string
+    name: string
+    previousPhase: ProjectPhase
+    currentPhase: ProjectPhase
+  }
+  issues: PhaseGateIssue[]
+}
+
+/**
+ * Gate evaluation found missing deliverables. The PM must review the issues
+ * and re-call with `forceOverride: true` if they accept the risk.
+ */
+export interface AdvancePhaseWarning {
+  success: true
+  outcome: 'warning'
+  message: string
+  issues: PhaseGateIssue[]
+  isHardGate: boolean
+}
+
+/** DesignTransfer is a hard gate — it cannot be overridden. */
+export interface AdvancePhaseHardGate {
   success: false
-  reason: 'blocked' | 'hard_gate'
+  reason: 'hard_gate'
   message: string
   issues: PhaseGateIssue[]
 }
+
+export type AdvancePhaseResult =
+  | AdvancePhaseSuccess
+  | AdvancePhaseForced
+  | AdvancePhaseWarning
+  | AdvancePhaseHardGate
 
 // ─── Phase ordering ───────────────────────────────────────────────────────────
 
@@ -123,18 +160,28 @@ export async function evaluatePhaseGate(
 /**
  * Advances a project to the next phase, subject to gate evaluation.
  *
+ * Flow:
+ *  1. Evaluate gate — check all required deliverables for the current phase.
+ *  2. If gate passes → advance (outcome: "advanced").
+ *  3. If gate fails and isHardGate → return hard_gate error (outcome: "hard_gate").
+ *  4. If gate fails on a soft gate:
+ *     - No forceOverride → return warning with issue list (outcome: "warning").
+ *     - forceOverride: true → advance anyway, record audit log (outcome: "forced").
+ *
  * @param projectId
- * @param override  - When provided, the PM has explicitly accepted the risk of
- *                   proceeding despite missing deliverables (soft gates only).
- *                   DesignTransfer can never be overridden.
+ * @param options.forceOverride   - PM accepts the risk and forces advancement (soft gates only).
+ *                                  DesignTransfer can never be overridden.
+ * @param options.overriddenById  - Required when forceOverride is true; records who triggered it.
+ * @param options.rationale       - Optional note on why the override was triggered.
  */
 export async function advancePhase(
   projectId: string,
-  override?: {
-    overriddenById: string
+  options?: {
+    forceOverride?: boolean
+    overriddenById?: string
     rationale?: string
   },
-): Promise<AdvancePhaseSuccess | AdvancePhaseBlocked> {
+): Promise<AdvancePhaseResult> {
   const gate = await evaluatePhaseGate(projectId)
 
   // ── Gate passed ──────────────────────────────────────────────────────────────
@@ -154,20 +201,6 @@ export async function advancePhase(
         const target = getNextPhase(current.currentPhase)
         if (!target) throw new Error('Already at final phase')
 
-        // If this is an override (rare but allowed for soft gates), persist audit record
-        if (override) {
-          await tx.phaseTransition.create({
-            data: {
-              projectId,
-              fromPhase: current.currentPhase,
-              toPhase: target,
-              triggeredById: override.overriddenById,
-              wasOverride: true,
-              overrideReason: override.rationale ?? null,
-            },
-          })
-        }
-
         return tx.project.update({
           where: { id: projectId },
           data: { currentPhase: target, previousPhase: current.currentPhase },
@@ -177,7 +210,7 @@ export async function advancePhase(
 
       return {
         success: true,
-        wasOverridden: Boolean(override),
+        outcome: 'advanced',
         project: {
           id: result.id,
           code: result.code,
@@ -188,9 +221,7 @@ export async function advancePhase(
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      if (msg === `Project not found: ${projectId}` || msg === 'Already at final phase') {
-        throw err
-      }
+      if (msg.startsWith('Project not found') || msg === 'Already at final phase') throw err
       throw new Error(`Phase advancement transaction failed: ${msg}`)
     }
   }
@@ -198,7 +229,7 @@ export async function advancePhase(
   // ── Gate failed ─────────────────────────────────────────────────────────────
   const { issues, isHardGate } = gate
 
-  // DesignTransfer hard gate — no override under any circumstances
+  // DesignTransfer hard gate — no override permitted under any circumstances
   if (isHardGate) {
     return {
       success: false,
@@ -208,18 +239,21 @@ export async function advancePhase(
     }
   }
 
-  // Soft gate — override is optional; if not provided, return blocked result
-  if (!override) {
-    const list = issues.map((i) => `[${i.deliverableCode}] ${i.deliverableTitle}（${i.reason}）`).join('\n')
+  // Soft gate — return warning with issue list
+  if (!options?.forceOverride) {
+    const list = issues
+      .map((i) => `[${i.deliverableCode}] ${i.deliverableTitle}（${i.reason}）`)
+      .join('\n')
     return {
-      success: false,
-      reason: 'blocked',
-      message: `以下 ${issues.length} 項文件尚未 Released，請完成後再推進，或提供 PM override 決策以繼續：\n${list}`,
+      success: true,
+      outcome: 'warning',
+      isHardGate: false,
+      message: `以下 ${issues.length} 項文件尚未 Released，請完成後再推進，或使用 forceOverride 參數強制推進：\n${list}`,
       issues,
     }
   }
 
-  // Override provided — create audit record and advance
+  // forceOverride=true — PM accepts risk; advance and record audit
   let previousPhase: ProjectPhase
 
   try {
@@ -235,14 +269,15 @@ export async function advancePhase(
       const target = getNextPhase(current.currentPhase)
       if (!target) throw new Error('Already at final phase')
 
+      // Persist override as an audit event
       await tx.phaseTransition.create({
         data: {
           projectId,
           fromPhase: current.currentPhase,
           toPhase: target,
-          triggeredById: override.overriddenById,
+          triggeredById: options.overriddenById ?? null,
           wasOverride: true,
-          overrideReason: override.rationale ?? null,
+          overrideReason: options.rationale ?? null,
         },
       })
 
@@ -255,7 +290,7 @@ export async function advancePhase(
 
     return {
       success: true,
-      wasOverridden: true,
+      outcome: 'forced',
       project: {
         id: result.id,
         code: result.code,
@@ -263,12 +298,11 @@ export async function advancePhase(
         previousPhase,
         currentPhase: result.currentPhase,
       },
+      issues,
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    if (msg === `Project not found: ${projectId}` || msg === 'Already at final phase') {
-      throw err
-    }
+    if (msg.startsWith('Project not found') || msg === 'Already at final phase') throw err
     throw new Error(`Phase advancement transaction failed: ${msg}`)
   }
 }
