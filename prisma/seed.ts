@@ -1,3 +1,6 @@
+import { mkdir, writeFile } from 'node:fs/promises'
+import path from 'node:path'
+
 import {
   ChangeRequestStatus,
   DeliverableStatus,
@@ -9,6 +12,12 @@ import {
 } from '@prisma/client'
 
 const prisma = new PrismaClient()
+
+async function writeDemoStoredFile(storagePath: string, content: string) {
+  const absolutePath = path.resolve(process.cwd(), storagePath)
+  await mkdir(path.dirname(absolutePath), { recursive: true })
+  await writeFile(absolutePath, content, 'utf8')
+}
 
 async function upsertUser(email: string, name: string, role: Role) {
   return prisma.user.upsert({
@@ -487,19 +496,26 @@ async function main() {
       },
     },
     update: {
-      fileName: 'alpha-design-input-v1.pdf',
-      storagePath: '/demo/alpha/design-input-v1.pdf',
+      fileName: 'alpha-design-input-v1.txt',
+      storagePath: 'storage/revisions/demo-alpha/ALPHA-DI-001/r001-alpha-design-input-v1.txt',
       uploadedById: qa.id,
+      mimeType: 'text/plain',
     },
     create: {
       deliverableId: alphaInputPack.id,
       revisionNumber: 1,
-      fileName: 'alpha-design-input-v1.pdf',
-      storagePath: '/demo/alpha/design-input-v1.pdf',
+      fileName: 'alpha-design-input-v1.txt',
+      storagePath: 'storage/revisions/demo-alpha/ALPHA-DI-001/r001-alpha-design-input-v1.txt',
       uploadedById: qa.id,
+      mimeType: 'text/plain',
       changeSummary: 'Initial released design input bundle.',
     },
   })
+
+  await writeDemoStoredFile(
+    'storage/revisions/demo-alpha/ALPHA-DI-001/r001-alpha-design-input-v1.txt',
+    'Demo Alpha Design Input Package\n\nThis is a seeded local file for download testing.',
+  )
 
   await prisma.fileRevision.upsert({
     where: {
@@ -509,19 +525,26 @@ async function main() {
       },
     },
     update: {
-      fileName: 'alpha-output-pack-r1.zip',
-      storagePath: '/demo/alpha/output-pack-r1.zip',
+      fileName: 'alpha-output-pack-r1.txt',
+      storagePath: 'storage/revisions/demo-alpha/ALPHA-DO-001/r001-alpha-output-pack-r1.txt',
       uploadedById: rd2.id,
+      mimeType: 'text/plain',
     },
     create: {
       deliverableId: alphaOutputPack.id,
       revisionNumber: 1,
-      fileName: 'alpha-output-pack-r1.zip',
-      storagePath: '/demo/alpha/output-pack-r1.zip',
+      fileName: 'alpha-output-pack-r1.txt',
+      storagePath: 'storage/revisions/demo-alpha/ALPHA-DO-001/r001-alpha-output-pack-r1.txt',
       uploadedById: rd2.id,
+      mimeType: 'text/plain',
       changeSummary: 'Early engineering output draft uploaded before formal promotion.',
     },
   })
+
+  await writeDemoStoredFile(
+    'storage/revisions/demo-alpha/ALPHA-DO-001/r001-alpha-output-pack-r1.txt',
+    'Demo Alpha Design Output Draft\n\nSeeded local file to exercise revision download.',
+  )
 
   await prisma.fileRevision.upsert({
     where: {
@@ -531,19 +554,26 @@ async function main() {
       },
     },
     update: {
-      fileName: 'beta-validation-summary-r1.pdf',
-      storagePath: '/demo/beta/validation-summary-r1.pdf',
+      fileName: 'beta-validation-summary-r1.txt',
+      storagePath: 'storage/revisions/demo-beta/BETA-VAL-001/r001-beta-validation-summary-r1.txt',
       uploadedById: rd1.id,
+      mimeType: 'text/plain',
     },
     create: {
       deliverableId: betaValidation.id,
       revisionNumber: 1,
-      fileName: 'beta-validation-summary-r1.pdf',
-      storagePath: '/demo/beta/validation-summary-r1.pdf',
+      fileName: 'beta-validation-summary-r1.txt',
+      storagePath: 'storage/revisions/demo-beta/BETA-VAL-001/r001-beta-validation-summary-r1.txt',
       uploadedById: rd1.id,
+      mimeType: 'text/plain',
       changeSummary: 'Current validation evidence package under QA review.',
     },
   })
+
+  await writeDemoStoredFile(
+    'storage/revisions/demo-beta/BETA-VAL-001/r001-beta-validation-summary-r1.txt',
+    'Demo Beta Validation Summary\n\nSeeded local file for pending-item and download testing.',
+  )
 
   const alphaTransition = await ensurePhaseTransition({
     projectId: alpha.id,
@@ -695,21 +725,28 @@ async function main() {
       },
     },
     update: {
-      fileName: 'beta-transfer-packet-r1.pdf',
-      storagePath: '/demo/beta/transfer-packet-r1.pdf',
+      fileName: 'beta-transfer-packet-r1.txt',
+      storagePath: 'storage/revisions/demo-beta/BETA-DT-001/r001-beta-transfer-packet-r1.txt',
       uploadedById: qa.id,
       changeRequestId: betaCr.id,
+      mimeType: 'text/plain',
     },
     create: {
       deliverableId: betaTransfer.id,
       revisionNumber: 1,
-      fileName: 'beta-transfer-packet-r1.pdf',
-      storagePath: '/demo/beta/transfer-packet-r1.pdf',
+      fileName: 'beta-transfer-packet-r1.txt',
+      storagePath: 'storage/revisions/demo-beta/BETA-DT-001/r001-beta-transfer-packet-r1.txt',
       uploadedById: qa.id,
       changeRequestId: betaCr.id,
+      mimeType: 'text/plain',
       changeSummary: 'Initial transfer packet linked to approved component alternate CR.',
     },
   })
+
+  await writeDemoStoredFile(
+    'storage/revisions/demo-beta/BETA-DT-001/r001-beta-transfer-packet-r1.txt',
+    'Demo Beta Design Transfer Packet\n\nSeeded local file linked to an approved change request.',
+  )
 
   console.log('Demo seed complete.')
   console.log(`Projects: ${alpha.code}, ${beta.code}`)

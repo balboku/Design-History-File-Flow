@@ -1,5 +1,4 @@
 import {
-  ChangeRequestStatus,
   DeliverableStatus,
   PendingItemStatus,
   ProjectPhase,
@@ -223,6 +222,10 @@ export async function getProjectDetail(projectId: string) {
             select: {
               id: true,
               revisionNumber: true,
+              fileName: true,
+              mimeType: true,
+              fileSizeBytes: true,
+              createdAt: true,
             },
             orderBy: { revisionNumber: 'desc' },
           },
@@ -351,6 +354,8 @@ export async function getDeliverableBoardData() {
           id: true,
           revisionNumber: true,
           fileName: true,
+          fileSizeBytes: true,
+          createdAt: true,
         },
         orderBy: { revisionNumber: 'desc' },
       },

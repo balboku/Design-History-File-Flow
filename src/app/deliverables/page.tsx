@@ -1,6 +1,22 @@
 import { AppShell, EmptyPanel, SectionCard, StatusPill } from '@/components/app-shell'
 import { getDeliverableBoardData } from '@/lib/frontend-data'
 
+function formatFileSize(value: number | null) {
+  if (!value || value <= 0) {
+    return 'Unknown size'
+  }
+
+  if (value < 1024) {
+    return `${value} B`
+  }
+
+  if (value < 1024 * 1024) {
+    return `${(value / 1024).toFixed(1)} KB`
+  }
+
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`
+}
+
 export default async function DeliverablesPage() {
   const deliverables = await getDeliverableBoardData()
 
@@ -57,6 +73,21 @@ export default async function DeliverablesPage() {
                   Revisions: {deliverable.fileRevisions.length} · Linked tasks:{' '}
                   {deliverable.taskLinks.length} · Owner: {deliverable.owner?.name ?? 'Unassigned'}
                 </div>
+                {deliverable.fileRevisions[0] ? (
+                  <a
+                    href={`/api/file-revisions/${deliverable.fileRevisions[0].id}/download`}
+                    style={{
+                      display: 'inline-flex',
+                      marginTop: 12,
+                      color: '#5a4329',
+                      textDecoration: 'none',
+                      fontWeight: 700,
+                    }}
+                  >
+                    Download latest revision · r{deliverable.fileRevisions[0].revisionNumber} ·{' '}
+                    {formatFileSize(deliverable.fileRevisions[0].fileSizeBytes)}
+                  </a>
+                ) : null}
               </div>
             ))}
           </div>

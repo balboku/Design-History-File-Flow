@@ -11,7 +11,6 @@ import {
 } from '@/actions/task-actions'
 import {
   createDeliverableAction,
-  createFileRevisionAction,
   updateDeliverableStatusAction,
 } from '@/actions/deliverable-actions'
 import {
@@ -33,6 +32,22 @@ function buildUrl(projectId: string, params: { notice?: string; error?: string }
   if (params.error) search.set('error', params.error)
   const query = search.toString()
   return query ? `/projects/${projectId}?${query}` : `/projects/${projectId}`
+}
+
+function formatFileSize(value: number | null) {
+  if (!value || value <= 0) {
+    return 'Unknown size'
+  }
+
+  if (value < 1024) {
+    return `${value} B`
+  }
+
+  if (value < 1024 * 1024) {
+    return `${(value / 1024).toFixed(1)} KB`
+  }
+
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`
 }
 
 export default async function ProjectDetailPage({
@@ -138,33 +153,6 @@ export default async function ProjectDetailPage({
 
     if (result.success) {
       redirect(buildUrl(projectId, { notice: `Deliverable ${result.data.code} created` }))
-    }
-
-    redirect(buildUrl(projectId, { error: result.error }))
-  }
-
-  async function createRevisionForm(formData: FormData) {
-    'use server'
-
-    const fileSizeRaw = String(formData.get('fileSizeBytes') ?? '')
-    const revisionRaw = String(formData.get('revisionNumber') ?? '')
-    const result = await createFileRevisionAction({
-      deliverableId: String(formData.get('deliverableId') ?? ''),
-      fileName: String(formData.get('fileName') ?? ''),
-      storagePath: String(formData.get('storagePath') ?? ''),
-      changeSummary: String(formData.get('changeSummary') ?? '') || undefined,
-      uploadedById: String(formData.get('uploadedById') ?? '') || undefined,
-      changeRequestId: String(formData.get('changeRequestId') ?? '') || undefined,
-      fileSizeBytes: fileSizeRaw ? Number(fileSizeRaw) : undefined,
-      revisionNumber: revisionRaw ? Number(revisionRaw) : undefined,
-    })
-
-    if (result.success) {
-      redirect(
-        buildUrl(projectId, {
-          notice: `Revision r${result.data.revisionNumber} logged for ${result.data.fileName}`,
-        }),
-      )
     }
 
     redirect(buildUrl(projectId, { error: result.error }))
@@ -555,6 +543,60 @@ export default async function ProjectDetailPage({
                   </div>
                 </div>
 
+                <div style={{ marginBottom: 14 }}>
+                  <div style={fieldLabelStyle}>Stored revisions</div>
+                  {deliverable.fileRevisions.length === 0 ? (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        borderRadius: 18,
+                        padding: 14,
+                        background: 'rgba(255,255,255,0.46)',
+                        color: '#6d5942',
+                      }}
+                    >
+                      No uploaded files yet.
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        display: 'grid',
+                        gap: 8,
+                        marginTop: 8,
+                      }}
+                    >
+                      {deliverable.fileRevisions.map((revision) => (
+                        <a
+                          key={revision.id}
+                          href={`/api/file-revisions/${revision.id}/download`}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            gap: 10,
+                            flexWrap: 'wrap',
+                            alignItems: 'center',
+                            borderRadius: 18,
+                            padding: '12px 14px',
+                            background: 'rgba(255,255,255,0.66)',
+                            textDecoration: 'none',
+                            color: '#3d2f1d',
+                          }}
+                        >
+                          <span>
+                            r{revision.revisionNumber} · {revision.fileName}
+                          </span>
+                          <span style={{ color: '#6a543b', fontSize: 14 }}>
+                            {formatFileSize(revision.fileSizeBytes)} ·{' '}
+                            {new Intl.DateTimeFormat('zh-TW', {
+                              dateStyle: 'medium',
+                            }).format(revision.createdAt)}
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div
                   style={{
                     display: 'grid',
@@ -563,8 +605,12 @@ export default async function ProjectDetailPage({
                     alignItems: 'start',
                   }}
                 >
-                  <form action={createRevisionForm} style={{ display: 'grid', gap: 10 }}>
-                    <input type="hidden" name="deliverableId" value={deliverable.id} />
+                  <form
+                    action={`/api/projects/${projectId}/deliverables/${deliverable.id}/revisions`}
+                    method="POST"
+                    encType="multipart/form-data"
+                    style={{ display: 'grid', gap: 10 }}
+                  >
                     <div style={fieldLabelStyle}>Log file revision</div>
                     <div
                       style={{
@@ -573,24 +619,12 @@ export default async function ProjectDetailPage({
                         gap: 10,
                       }}
                     >
-                      <input name="fileName" placeholder="File name" style={inputStyle} />
-                      <input
-                        name="storagePath"
-                        placeholder="Storage path"
-                        style={inputStyle}
-                      />
+                      <input name="file" type="file" style={inputStyle} />
                       <input
                         name="revisionNumber"
                         type="number"
                         min="1"
                         placeholder="Revision number (optional)"
-                        style={inputStyle}
-                      />
-                      <input
-                        name="fileSizeBytes"
-                        type="number"
-                        min="0"
-                        placeholder="File size bytes"
                         style={inputStyle}
                       />
                       <select name="uploadedById" defaultValue="" style={inputStyle}>
@@ -616,8 +650,11 @@ export default async function ProjectDetailPage({
                       style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }}
                     />
                     <button type="submit" style={buttonStyle}>
-                      Log Revision
+                      Upload Revision
                     </button>
+                    <div style={{ color: '#6c573f', lineHeight: 1.5 }}>
+                      Locked deliverables require a linked change request before a new file can be uploaded.
+                    </div>
                   </form>
 
                   <form action={updateDeliverableStatusForm} style={{ display: 'grid', gap: 10 }}>
