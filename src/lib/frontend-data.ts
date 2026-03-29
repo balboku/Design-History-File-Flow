@@ -211,6 +211,10 @@ export async function getProjectDetail(projectId: string) {
                   code: true,
                   title: true,
                   status: true,
+                  fileRevisions: {
+                    where: { changeRequestId: null },
+                    select: { id: true },
+                  },
                 },
               },
             },

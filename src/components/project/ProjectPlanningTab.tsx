@@ -4,12 +4,14 @@ import type { CSSProperties } from 'react'
 import { useState } from 'react'
 import { ProjectPhase, Role } from '@prisma/client'
 import { useRouter } from 'next/navigation'
-import { MetricCard, SectionCard, StatusPill, EmptyPanel } from '@/components/app-shell'
+import { MetricCard, SectionCard, EmptyPanel } from '@/components/app-shell'
 import { ProjectGantt } from '@/components/project-gantt'
+import { KanbanBoard } from '@/components/project/KanbanBoard'
+import type { KanbanTask } from '@/components/project/TaskCard'
 import { PHASE_ORDER } from '@/lib/phase-service'
-import { createTaskAction, startTaskAction, completeTaskAction } from '@/actions/task-actions'
+import { createTaskAction } from '@/actions/task-actions'
 import { createDeliverableAction } from '@/actions/deliverable-actions'
-import { formatProjectPhase, formatTaskStatus, formatDateShort } from '@/lib/ui-labels'
+import { formatProjectPhase, formatDateShort } from '@/lib/ui-labels'
 
 interface LookupUser {
   id: string
@@ -27,7 +29,15 @@ interface Task {
   plannedStartDate?: Date | string | null
   targetDate?: Date | string | null
   assignee?: { name?: string } | null
-  deliverableLinks: { deliverable: { code: string } }[]
+  deliverableLinks: {
+    deliverable: {
+      id: string
+      code: string
+      title: string
+      status: string
+      fileRevisions: { id: string }[]
+    }
+  }[]
 }
 
 interface Deliverable {
@@ -71,29 +81,29 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
     return d
   }
 
+  // Cast Task[] to KanbanTask[] (compatible shape after frontend-data.ts update)
+  const kanbanTasks: KanbanTask[] = project.tasks as KanbanTask[]
+
+  const inputClass = "w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-[14px] font-medium text-slate-900 transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+  const darkInputClass = "w-full rounded-xl border border-white/16 bg-white/10 px-4 py-3 text-[14px] font-medium text-[#fff7ec] placeholder-white/40 transition-colors focus:border-white/40 focus:bg-white/15 focus:outline-none"
+
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       {/* Metrics */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
-          gap: 16,
-        }}
-      >
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5 lg:gap-6">
         <MetricCard label="當前階段" value={formatProjectPhase(project.currentPhase)} />
         <MetricCard
           label="已完成任務"
           value={`${doneTasks}/${project.tasks.length}`}
-          accent="var(--app-accent)"
+          accent="var(--app-primary-strong)"
         />
         <MetricCard
           label="At-Risk 任務"
           value={String(atRiskTasks)}
           hint="超前或落後專案當前階段的進行中任務"
-          accent={atRiskTasks > 0 ? 'var(--app-danger)' : 'var(--app-success)'}
+          accent={atRiskTasks > 0 ? 'var(--app-danger)' : 'var(--app-text-soft)'}
         />
-        <MetricCard label="已釋出文件" value="–" accent="var(--app-success)" />
+        <MetricCard label="已釋出文件" value="–" accent="var(--app-primary-strong)" />
         <MetricCard label="文件空殼" value={String(project.deliverables.length)} />
       </div>
 
@@ -105,232 +115,72 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
         <ProjectGantt tasks={project.tasks} />
       </SectionCard>
 
-      {/* Task List + Action Buttons */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 18 }}>
-        <SectionCard
-          title="開發任務"
-          subtitle="任務允許先於專案當前階段啟動，系統只提示風險，不會把 RD 的實際工作直接鎖死。"
-        >
-          {project.tasks.length === 0 ? (
-            <EmptyPanel
-              title="尚無任務"
-              body="點擊右側「+ 建立開發任務」建立第一筆可追溯的 RD 任務。"
-            />
-          ) : (
-            <div style={{ display: 'grid', gap: 12 }}>
-              {project.tasks.map((task) => {
-                const isOverdue =
-                  !!task.targetDate &&
-                  new Date(task.targetDate as string) < new Date() &&
-                  task.status !== 'Done'
-                return (
-                  <div
-                    key={task.id}
-                    style={{
-                      borderRadius: 20,
-                      padding: 16,
-                      background: 'rgba(255,255,255,0.54)',
-                    }}
-                  >
-                    {isOverdue && (
-                      <div style={{ marginBottom: 8 }}>
-                        <StatusPill label="已延遲" tone="critical" />
-                      </div>
-                    )}
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        gap: 12,
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontSize: 12, color: '#896945' }}>{task.code}</div>
-                        <div style={{ fontSize: 20, fontWeight: 700 }}>{task.title}</div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <StatusPill
-                          label={formatTaskStatus(task.status as any)}
-                          tone={
-                            task.status === 'Done'
-                              ? 'good'
-                              : task.status === 'InProgress'
-                                ? 'warn'
-                                : 'neutral'
-                          }
-                        />
-                        <StatusPill
-                          label={`預計階段 ${formatProjectPhase(task.plannedPhase)}`}
-                          tone={task.plannedPhase !== project.currentPhase ? 'warn' : 'neutral'}
-                        />
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        marginTop: 10,
-                        color: '#65513a',
-                        lineHeight: 1.6,
-                        fontSize: 14,
-                      }}
-                    >
-                      {task.description ?? '尚未填寫任務描述。'}
-                    </div>
-                    {(task.plannedStartDate || task.targetDate) && (
-                      <div
-                        style={{
-                          marginTop: 8,
-                          fontSize: 13,
-                          color: '#7a5c38',
-                          fontFamily: 'monospace',
-                        }}
-                      >
-                        ⌚ {formatDateShort(toDate(task.plannedStartDate))} →{' '}
-                        {formatDateShort(toDate(task.targetDate))}
-                      </div>
-                    )}
-                    <div style={{ marginTop: 10, color: '#5b452c', fontSize: 13 }}>
-                      綁定文件：
-                      {task.deliverableLinks.map((l) => l.deliverable.code).join(', ')}
-                    </div>
-                    <div style={{ marginTop: 6, color: '#5b452c', fontSize: 13 }}>
-                      指派給：{task.assignee?.name ?? '未指派'}
-                    </div>
-                    {task.status === 'Todo' ? (
-                      <form
-                        action={async (formData: FormData) => {
-                          const res = await startTaskAction(String(formData.get('taskId') ?? ''))
-                          if (!res.success) {
-                            router.push(`?tab=planning&error=${encodeURIComponent(res.error)}`)
-                          } else {
-                            router.refresh()
-                          }
-                        }}
-                        style={{ marginTop: 12 }}
-                      >
-                        <input type="hidden" name="taskId" value={task.id} />
-                        <button type="submit" style={buttonStyle}>
-                          開始執行
-                        </button>
-                      </form>
-                    ) : task.status === 'InProgress' ? (
-                      <form
-                        action={async (formData: FormData) => {
-                          const res = await completeTaskAction(String(formData.get('taskId') ?? ''))
-                          if (!res.success) {
-                            router.push(`?tab=planning&error=${encodeURIComponent(res.error)}`)
-                          } else {
-                            router.refresh()
-                          }
-                        }}
-                        style={{ marginTop: 12 }}
-                      >
-                        <input type="hidden" name="taskId" value={task.id} />
-                        <button type="submit" style={buttonStyle}>
-                          標記完成
-                        </button>
-                      </form>
-                    ) : null}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </SectionCard>
-
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Kanban Board */}
+      <SectionCard
+        title="開發任務看板"
+        subtitle="拖曳任務卡片以更新進度。移往「已完成」時，如文件尚未上傳，系統將引導您先完成上傳。"
+      >
+        {/* Action Buttons Row */}
+        <div className="mb-5 flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={() => setTaskDialogOpen(true)}
-            style={primaryButtonStyle}
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-5 py-2.5 text-[14px] font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2"
           >
-            + 建立開發任務
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            建立開發任務
           </button>
           <button
             type="button"
             onClick={() => setDeliverableDialogOpen(true)}
-            style={primaryButtonStyle}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-[14px] font-bold text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2"
           >
-            + 新增文件空殼
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            新增文件空殼
           </button>
-          <div
-            style={{
-              borderRadius: 22,
-              padding: 16,
-              background: 'rgba(255,255,255,0.54)',
-              fontSize: 13,
-              color: '#6d5942',
-              lineHeight: 1.6,
-            }}
-          >
-            <strong>Task-Deliverable 綁定原則</strong>
-            <br />
-            每個任務必須至少綁定一個文件空殼，以確保 RD 的工作與法規產出有完整可追溯性。
+          <div className="ml-auto hidden sm:block rounded-xl border border-slate-200/60 bg-slate-50/50 px-4 py-2 text-[12px] font-medium text-slate-500">
+            每個任務必須至少綁定一份文件空殼，以確保工作有完整可追溯性。
           </div>
         </div>
-      </div>
 
-      {/* Create Task Dialog */}
+        {project.tasks.length === 0 ? (
+          <EmptyPanel
+            title="尚無任務"
+            body="點擊「建立開發任務」以建立第一筆可追溯的 RD 任務。"
+          />
+        ) : (
+          <KanbanBoard tasks={kanbanTasks} lookupUsers={lookupUsers} />
+        )}
+      </SectionCard>
+
+      {/* ─── Create Task Dialog ───────────────────────────────────────────────── */}
       {taskDialogOpen && (
         <dialog
           open
-          style={{
-            position: 'fixed',
-            inset: 0,
-            width: '100vw',
-            height: '100vh',
-            background: 'rgba(0,0,0,0.45)',
-            border: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 50,
-            margin: 0,
-            padding: 0,
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setTaskDialogOpen(false)
-          }}
+          className="fixed inset-0 z-50 flex h-[100vh] w-[100vw] items-center justify-center m-0 bg-slate-900/50 p-4 sm:p-6 backdrop-blur-[2px]"
+          onClick={(e) => { if (e.target === e.currentTarget) setTaskDialogOpen(false) }}
         >
           <div
+            className="w-full max-w-[520px] max-h-[90vh] overflow-y-auto rounded-[32px] p-7 sm:p-9 text-[#f2fbfc]"
             style={{
-              borderRadius: 28,
-              padding: 32,
-              background:
-                'linear-gradient(135deg, rgba(10,73,90,0.97), rgba(8,58,72,0.95))',
+              background: 'linear-gradient(135deg, rgba(10,73,90,0.97), rgba(8,58,72,0.95))',
               border: '1px solid rgba(203,241,248,0.12)',
               boxShadow: '0 32px 80px rgba(3,33,44,0.4)',
-              width: '100%',
-              maxWidth: 520,
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              color: '#f2fbfc',
             }}
           >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 24,
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#f2fbfc' }}>
-                建立開發任務
-              </h3>
+            <div className="mb-6 flex items-start justify-between">
+              <div>
+                <h3 className="m-0 text-xl font-bold tracking-tight text-[#f2fbfc]">建立開發任務</h3>
+                <p className="mt-1 mb-0 text-[14px] text-[rgba(218,245,250,0.7)]">任務必須至少綁定一份文件空殼。</p>
+              </div>
               <button
                 type="button"
                 onClick={() => setTaskDialogOpen(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: 24,
-                  cursor: 'pointer',
-                  color: 'rgba(218,245,250,0.7)',
-                  padding: '4px 8px',
-                  borderRadius: 8,
-                }}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/60 transition-colors hover:bg-white/20 hover:text-white focus:outline-none"
               >
                 ✕
               </button>
@@ -338,7 +188,7 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
 
             <form
               action={async (formData: FormData) => {
-                await createTaskAction({
+                const res = await createTaskAction({
                   projectId: project.id,
                   code: String(formData.get('code') ?? ''),
                   title: String(formData.get('title') ?? ''),
@@ -350,68 +200,73 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
                   plannedStartDate: String(formData.get('plannedStartDate') ?? '') || null,
                   targetDate: String(formData.get('targetDate') ?? '') || null,
                 })
-                router.refresh()
+                if (res.success) {
+                  setTaskDialogOpen(false)
+                  router.refresh()
+                }
               }}
-              style={{ display: 'grid', gap: 12 }}
+              className="flex flex-col gap-4"
             >
-              <input name="code" placeholder="任務代碼" style={inputStyleDark} required />
-              <input name="title" placeholder="任務名稱" style={inputStyleDark} required />
+              <div className="grid grid-cols-2 gap-4">
+                <input name="code" placeholder="任務代碼（如 DI-001）" className={darkInputClass} required />
+                <input name="title" placeholder="任務名稱" className={darkInputClass} required />
+              </div>
               <textarea
                 name="description"
                 placeholder="任務描述"
-                style={{ ...inputStyleDark, minHeight: 88, resize: 'vertical' }}
+                className={`${darkInputClass} min-h-[80px] resize-y`}
               />
-              <select
-                name="plannedPhase"
-                defaultValue={project.currentPhase}
-                style={inputStyleDark}
-              >
+              <select name="plannedPhase" defaultValue={project.currentPhase} className={darkInputClass}>
                 {Object.values(ProjectPhase).map((phase) => (
-                  <option key={phase} value={phase}>
-                    {formatProjectPhase(phase)}
-                  </option>
+                  <option key={phase} value={phase}>{formatProjectPhase(phase)}</option>
                 ))}
               </select>
-              <select name="assigneeId" defaultValue="" style={inputStyleDark}>
+              <select name="assigneeId" defaultValue="" className={darkInputClass}>
                 <option value="">稍後再指派 RD</option>
                 {rdUsers.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
+                  <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
               </select>
-              <select name="createdById" defaultValue="" style={inputStyleDark}>
+              <select name="createdById" defaultValue="" className={darkInputClass}>
                 <option value="">由系統 / 目前使用者建立</option>
                 {lookupUsers.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
+                  <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
               </select>
-              <label style={{ fontSize: 13, color: 'rgba(218,245,250,0.7)' }}>
-                預計開始日
-              </label>
-              <input type="date" name="plannedStartDate" style={inputStyleDark} />
-              <label style={{ fontSize: 13, color: 'rgba(218,245,250,0.7)' }}>
-                預計完成日
-              </label>
-              <input type="date" name="targetDate" style={inputStyleDark} />
-              <select
-                name="deliverableIds"
-                multiple
-                defaultValue={project.deliverables.slice(0, 2).map((d) => d.id)}
-                style={{ ...inputStyleDark, minHeight: 120 }}
-              >
-                {project.deliverables.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.code} · {d.title}
-                  </option>
-                ))}
-              </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[12px] font-bold text-[rgba(218,245,250,0.7)]">預計開始日</label>
+                  <input type="date" name="plannedStartDate" className={darkInputClass} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[12px] font-bold text-[rgba(218,245,250,0.7)]">預計完成日</label>
+                  <input type="date" name="targetDate" className={darkInputClass} />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[12px] font-bold text-[rgba(218,245,250,0.7)]">
+                  綁定文件空殼 (必選至少一項, 可複選)
+                </label>
+                <select
+                  name="deliverableIds"
+                  multiple
+                  defaultValue={project.deliverables.slice(0, 1).map((d) => d.id)}
+                  className={`${darkInputClass} min-h-[110px]`}
+                  required
+                >
+                  {project.deliverables.map((d) => (
+                    <option key={d.id} value={d.id}>{d.code} · {d.title}</option>
+                  ))}
+                </select>
+                {project.deliverables.length === 0 && (
+                  <p className="text-[12px] text-orange-300">尚無文件空殼。請先點擊「新增文件空殼」後再建立任務。</p>
+                )}
+              </div>
+
               <button
                 type="submit"
-                onClick={() => setTaskDialogOpen(false)}
-                style={buttonStyleLight}
+                className="mt-2 w-full rounded-xl bg-[rgba(255,244,223,0.92)] px-5 py-4 text-[15px] font-bold text-[#442e17] shadow transition-all hover:-translate-y-0.5 hover:bg-white focus:outline-none"
               >
                 建立可追溯任務
               </button>
@@ -420,66 +275,30 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
         </dialog>
       )}
 
-      {/* Create Deliverable Dialog */}
+      {/* ─── Create Deliverable Dialog ────────────────────────────────────────── */}
       {deliverableDialogOpen && (
         <dialog
           open
-          style={{
-            position: 'fixed',
-            inset: 0,
-            width: '100vw',
-            height: '100vh',
-            background: 'rgba(0,0,0,0.45)',
-            border: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 50,
-            margin: 0,
-            padding: 0,
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setDeliverableDialogOpen(false)
-          }}
+          className="fixed inset-0 z-50 flex h-[100vh] w-[100vw] items-center justify-center m-0 bg-slate-900/50 p-4 sm:p-6 backdrop-blur-[2px]"
+          onClick={(e) => { if (e.target === e.currentTarget) setDeliverableDialogOpen(false) }}
         >
           <div
+            className="w-full max-w-[480px] max-h-[90vh] overflow-y-auto rounded-[32px] p-7 sm:p-9 text-[#f2fbfc]"
             style={{
-              borderRadius: 28,
-              padding: 32,
-              background:
-                'linear-gradient(135deg, rgba(10,73,90,0.97), rgba(8,58,72,0.95))',
+              background: 'linear-gradient(135deg, rgba(10,73,90,0.97), rgba(8,58,72,0.95))',
               border: '1px solid rgba(203,241,248,0.12)',
               boxShadow: '0 32px 80px rgba(3,33,44,0.4)',
-              width: '100%',
-              maxWidth: 520,
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              color: '#f2fbfc',
             }}
           >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 24,
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#f2fbfc' }}>
-                新增文件空殼
-              </h3>
+            <div className="mb-6 flex items-start justify-between">
+              <div>
+                <h3 className="m-0 text-xl font-bold tracking-tight text-[#f2fbfc]">新增文件空殼</h3>
+                <p className="mt-1 mb-0 text-[14px] text-[rgba(218,245,250,0.7)]">建立後可在 DHF 合規文件頁籤上傳版次與審核。</p>
+              </div>
               <button
                 type="button"
                 onClick={() => setDeliverableDialogOpen(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: 24,
-                  cursor: 'pointer',
-                  color: 'rgba(218,245,250,0.7)',
-                  padding: '4px 8px',
-                  borderRadius: 8,
-                }}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/60 transition-colors hover:bg-white/20 hover:text-white focus:outline-none"
               >
                 ✕
               </button>
@@ -487,7 +306,7 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
 
             <form
               action={async (formData: FormData) => {
-                await createDeliverableAction({
+                const res = await createDeliverableAction({
                   projectId: project.id,
                   code: String(formData.get('code') ?? ''),
                   title: String(formData.get('title') ?? ''),
@@ -498,64 +317,50 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
                   actorId: String(formData.get('actorId') ?? ''),
                   targetDate: String(formData.get('targetDate') ?? '') || null,
                 })
-                router.refresh()
+                if (res.success) {
+                  setDeliverableDialogOpen(false)
+                  router.refresh()
+                }
               }}
-              style={{ display: 'grid', gap: 12 }}
+              className="flex flex-col gap-4"
             >
-              <input name="code" placeholder="文件代碼" style={inputStyleDark} required />
-              <input name="title" placeholder="文件名稱" style={inputStyleDark} required />
+              <div className="grid grid-cols-2 gap-4">
+                <input name="code" placeholder="文件代碼（如 DHF-001）" className={darkInputClass} required />
+                <input name="title" placeholder="文件名稱" className={darkInputClass} required />
+              </div>
               <textarea
                 name="description"
-                placeholder="文件說明"
-                style={{ ...inputStyleDark, minHeight: 88, resize: 'vertical' }}
+                placeholder="文件說明（選填）"
+                className={`${darkInputClass} min-h-[80px] resize-y`}
               />
-              <select
-                name="phase"
-                defaultValue={project.currentPhase}
-                style={inputStyleDark}
-              >
+              <select name="phase" defaultValue={project.currentPhase} className={darkInputClass}>
                 {Object.values(ProjectPhase).map((phase) => (
-                  <option key={phase} value={phase}>
-                    {formatProjectPhase(phase)}
-                  </option>
+                  <option key={phase} value={phase}>{formatProjectPhase(phase)}</option>
                 ))}
               </select>
-              <select name="ownerId" defaultValue="" style={inputStyleDark}>
+              <select name="ownerId" defaultValue="" className={darkInputClass}>
                 <option value="">稍後再指定 QA 負責人</option>
                 {qaUsers.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
+                  <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
               </select>
-              <select name="actorId" defaultValue="" style={inputStyleDark}>
-                <option value="">操作者 (建立人)</option>
+              <select name="actorId" defaultValue="" className={darkInputClass} required>
+                <option value="" disabled>操作者（建立人）</option>
                 {lookupUsers.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
+                  <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
               </select>
-              <label style={{ fontSize: 13, color: 'rgba(218,245,250,0.7)' }}>
-                預計交件日
-              </label>
-              <input type="date" name="targetDate" style={inputStyleDark} />
-              <label
-                style={{
-                  display: 'flex',
-                  gap: 10,
-                  alignItems: 'center',
-                  color: '#fff7ec',
-                  fontSize: 14,
-                }}
-              >
-                <input type="checkbox" name="isRequired" value="true" defaultChecked />
-                納入關卡審查
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[12px] font-bold text-[rgba(218,245,250,0.7)]">預計交件日</label>
+                <input type="date" name="targetDate" className={darkInputClass} />
+              </div>
+              <label className="flex items-center gap-3 text-[14px] font-medium text-[rgba(218,245,250,0.85)]">
+                <input type="checkbox" name="isRequired" value="true" defaultChecked className="h-4 w-4 rounded" />
+                納入階段關卡審查（IS0 13485 Required）
               </label>
               <button
                 type="submit"
-                onClick={() => setDeliverableDialogOpen(false)}
-                style={buttonStyleLight}
+                className="mt-2 w-full rounded-xl bg-[rgba(255,244,223,0.92)] px-5 py-4 text-[15px] font-bold text-[#442e17] shadow transition-all hover:-translate-y-0.5 hover:bg-white focus:outline-none"
               >
                 建立文件空殼
               </button>
@@ -565,49 +370,4 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
       )}
     </div>
   )
-}
-
-const inputStyleDark: CSSProperties = {
-  width: '100%',
-  borderRadius: 16,
-  border: '1px solid rgba(255,255,255,0.16)',
-  background: 'rgba(255, 244, 228, 0.1)',
-  padding: '14px 16px',
-  fontSize: 15,
-  color: '#fff7ec',
-  boxSizing: 'border-box',
-}
-
-const primaryButtonStyle: CSSProperties = {
-  border: 0,
-  borderRadius: 18,
-  padding: '16px 20px',
-  background: 'linear-gradient(135deg, var(--app-primary), var(--app-primary-strong))',
-  color: '#f5fbfc',
-  fontWeight: 700,
-  fontSize: 15,
-  cursor: 'pointer',
-  width: '100%',
-  boxShadow: '0 14px 30px rgba(11, 99, 120, 0.22)',
-}
-
-const buttonStyle: CSSProperties = {
-  border: 0,
-  borderRadius: 16,
-  padding: '12px 18px',
-  background: '#6b4927',
-  color: '#fff7ee',
-  fontWeight: 700,
-  cursor: 'pointer',
-}
-
-const buttonStyleLight: CSSProperties = {
-  border: 0,
-  borderRadius: 16,
-  padding: '14px 18px',
-  background: '#fff4df',
-  color: '#442e17',
-  fontWeight: 700,
-  cursor: 'pointer',
-  width: '100%',
 }
