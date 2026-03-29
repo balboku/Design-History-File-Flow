@@ -39,6 +39,7 @@ enum TaskStatus {
 
 enum ChangeRequestStatus {
   Draft
+  Active
   Submitted
   InReview
   Approved
@@ -77,7 +78,6 @@ model Project {
   owner          User?                    @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   tasks          Task[]
   deliverables   DeliverablePlaceholder[]
-  changeRequests ChangeRequest[]
   phaseTransitions PhaseTransition[]
 
   @@index([currentPhase])
@@ -117,7 +117,6 @@ model DeliverablePlaceholder {
   owner          User?             @relation("DeliverableOwner", fields: [ownerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   taskLinks      TaskDeliverable[]
   fileRevisions  FileRevision[]
-  changeRequests ChangeRequest[]
 
   @@unique([projectId, code])
   @@index([projectId, phase, status])
@@ -192,12 +191,37 @@ model PartComponent {
   manufacturer   String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
-  changeRequests ChangeRequest[]
+  changeRequests ChangeRequestPartComponent[]
 
   @@index([name])
 }
 
-/// Application invariant: at least one of projectId, deliverableId, or partComponentId must be set.
+/** Tags a DeliverablePlaceholder to a ChangeRequest. One CR can tag many deliverables. */
+model ChangeRequestDeliverable {
+  id                 String                 @id @default(cuid())
+  changeRequestId    String
+  deliverableId      String
+  createdAt          DateTime              @default(now())
+  changeRequest      ChangeRequest         @relation(fields: [changeRequestId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  deliverable        DeliverablePlaceholder @relation(fields: [deliverableId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([changeRequestId, deliverableId])
+  @@index([deliverableId])
+}
+
+/** Tags a PartComponent to a ChangeRequest. One CR can tag many part numbers. */
+model ChangeRequestPartComponent {
+  id                 String         @id @default(cuid())
+  changeRequestId    String
+  partComponentId    String
+  createdAt          DateTime       @default(now())
+  changeRequest      ChangeRequest  @relation(fields: [changeRequestId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  partComponent      PartComponent  @relation(fields: [partComponentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([changeRequestId, partComponentId])
+  @@index([partComponentId])
+}
+
 model ChangeRequest {
   id              String                  @id @default(cuid())
   code            String                  @unique
@@ -206,26 +230,19 @@ model ChangeRequest {
   status          ChangeRequestStatus     @default(Draft)
   impactAnalysis  String?
   requesterId     String?
-  approverId      String?
-  projectId       String?
-  deliverableId   String?
-  partComponentId String?
+  approverId     String?
   submittedAt     DateTime?
-  approvedAt      DateTime?
-  implementedAt   DateTime?
-  createdAt       DateTime                @default(now())
-  updatedAt       DateTime                @updatedAt
+  approvedAt     DateTime?
+  implementedAt  DateTime?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
   requester       User?                   @relation("ChangeRequester", fields: [requesterId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   approver        User?                   @relation("ChangeApprover", fields: [approverId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  project         Project?                @relation(fields: [projectId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  deliverable     DeliverablePlaceholder? @relation(fields: [deliverableId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  partComponent   PartComponent?          @relation(fields: [partComponentId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  deliverableLinks ChangeRequestDeliverable[]
+  partLinks       ChangeRequestPartComponent[]
   fileRevisions   FileRevision[]
 
   @@index([status])
   @@index([requesterId])
   @@index([approverId])
-  @@index([projectId])
-  @@index([deliverableId])
-  @@index([partComponentId])
 }
