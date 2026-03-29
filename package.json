@@ -2,14 +2,20 @@
   "name": "design-history-file-flow",
   "private": true,
   "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
+    "db:seed": "tsx prisma/seed.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
     "@prisma/client": "^6.19.2",
-    "prisma": "^6.19.2"
+    "prisma": "^6.19.2",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",

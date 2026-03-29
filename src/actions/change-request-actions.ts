@@ -1,0 +1,39 @@
+'use server'
+
+import { ChangeRequestStatus } from '@prisma/client'
+
+import { createChangeRequest } from '@/lib/change-request-service'
+
+export interface CreateChangeRequestActionInput {
+  code: string
+  title: string
+  description?: string
+  impactAnalysis?: string
+  projectId?: string | null
+  requesterId?: string | null
+  deliverableIds?: string[]
+  partComponentIds?: string[]
+  status?: ChangeRequestStatus
+}
+
+export type CreateChangeRequestActionResult = {
+  success: true
+  data: Awaited<ReturnType<typeof createChangeRequest>>['changeRequest']
+} | {
+  success: false
+  error: string
+}
+
+export async function createChangeRequestAction(
+  input: CreateChangeRequestActionInput,
+): Promise<CreateChangeRequestActionResult> {
+  try {
+    const result = await createChangeRequest(input)
+    return { success: true, data: result.changeRequest }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    }
+  }
+}

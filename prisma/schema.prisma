@@ -85,6 +85,7 @@ model Project {
   deliverables   DeliverablePlaceholder[]
   pendingItems   PendingItem[]
   phaseTransitions PhaseTransition[]
+  changeRequests ChangeRequest[]
 
   @@index([currentPhase])
   @@index([ownerId])
@@ -254,6 +255,7 @@ model ChangeRequestPartComponent {
 
 model ChangeRequest {
   id              String                  @id @default(cuid())
+  projectId       String?
   code            String                  @unique
   title           String
   description     String?
@@ -266,6 +268,7 @@ model ChangeRequest {
   implementedAt  DateTime?
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
+  project         Project?                @relation(fields: [projectId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   requester       User?                   @relation("ChangeRequester", fields: [requesterId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   approver        User?                   @relation("ChangeApprover", fields: [approverId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   deliverableLinks ChangeRequestDeliverable[]
@@ -273,6 +276,7 @@ model ChangeRequest {
   fileRevisions   FileRevision[]
 
   @@index([status])
+  @@index([projectId])
   @@index([requesterId])
   @@index([approverId])
 }
