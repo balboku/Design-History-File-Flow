@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react'
 
+import './globals.css'
+
 export const metadata = {
-  title: 'Design History File Flow',
-  description: 'Pending item and phase-gate tracking for medical device R&D',
+  title: 'Design History File Flow｜醫療器材研發專案管理',
+  description: '醫療器材研發專案的 Task、Deliverable、Phase Gate 與 Change Request 控制台',
 }
 
 export default function RootLayout({
@@ -12,19 +14,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-Hant">
-      <body
-        style={{
-          margin: 0,
-          fontFamily:
-            '"Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif',
-          background:
-            'linear-gradient(180deg, #f6f1e7 0%, #efe4d2 45%, #e3d3bd 100%)',
-          color: '#2d2418',
-          minHeight: '100vh',
-        }}
-      >
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   )
 }

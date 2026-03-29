@@ -1,6 +1,8 @@
 import type { CSSProperties, ReactNode } from 'react'
 import Link from 'next/link'
 
+import { ActiveNavLink } from './active-nav-link'
+
 export interface NavItem {
   href: string
   label: string
@@ -8,13 +10,13 @@ export interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: '/', label: 'Overview', caption: 'Mission control' },
-  { href: '/projects', label: 'Projects', caption: 'Program portfolio' },
-  { href: '/tasks', label: 'Tasks', caption: 'Execution stream' },
-  { href: '/deliverables', label: 'Deliverables', caption: 'Compliance outputs' },
-  { href: '/phase-gates', label: 'Phase Gates', caption: 'Go / no-go review' },
-  { href: '/change-requests', label: 'Change Requests', caption: 'Post-transfer control' },
-  { href: '/pending-items', label: 'Pending Items', caption: 'Work-at-risk carryovers' },
+  { href: '/', label: '總覽', caption: '專案戰情中心' },
+  { href: '/projects', label: '專案組合', caption: '專案建立與盤點' },
+  { href: '/tasks', label: '開發任務', caption: 'RD 執行流' },
+  { href: '/deliverables', label: '合規文件', caption: 'Placeholder 與版次' },
+  { href: '/phase-gates', label: '階段關卡', caption: 'Soft / Hard Gate' },
+  { href: '/change-requests', label: '變更管理', caption: '設計移轉後控管' },
+  { href: '/pending-items', label: '遺留項', caption: '條件式放行追蹤' },
 ]
 
 export function AppShell({
@@ -31,152 +33,215 @@ export function AppShell({
   children: ReactNode
 }) {
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background:
-          'radial-gradient(circle at top left, rgba(255, 247, 232, 0.95), rgba(228, 205, 176, 0.92) 34%, rgba(189, 155, 116, 0.88) 100%)',
-      }}
-    >
+    <div style={{ minHeight: '100vh' }}>
+      <a href="#main-content" className="skip-link">
+        略過導覽直接到主內容
+      </a>
+
       <div
         style={{
-          maxWidth: 1400,
+          maxWidth: 1440,
           margin: '0 auto',
-          padding: '28px 20px 72px',
-          display: 'grid',
-          gridTemplateColumns: '280px minmax(0, 1fr)',
-          gap: 24,
+          padding: '24px 18px 72px',
         }}
       >
-        <aside
-          style={{
-            borderRadius: 28,
-            padding: 24,
-            background: 'rgba(63, 43, 22, 0.82)',
-            color: '#f6ecdd',
-            boxShadow: '0 30px 80px rgba(57, 37, 16, 0.22)',
-            position: 'sticky',
-            top: 20,
-            alignSelf: 'start',
-          }}
-        >
-          <div style={{ marginBottom: 26 }}>
-            <p
+        <div className="app-shell-grid">
+          <aside className="app-shell-sidebar">
+            <div
               style={{
-                margin: 0,
-                textTransform: 'uppercase',
-                letterSpacing: '0.18em',
-                fontSize: 11,
-                color: 'rgba(255, 240, 220, 0.72)',
+                borderRadius: 30,
+                padding: 24,
+                background:
+                  'linear-gradient(180deg, var(--app-sidebar), var(--app-sidebar-soft))',
+                color: '#f3fbfc',
+                border: '1px solid rgba(189, 236, 247, 0.14)',
+                boxShadow: '0 28px 80px rgba(3, 33, 44, 0.28)',
+                overflow: 'hidden',
               }}
             >
-              Design History File Flow
-            </p>
-            <h1
-              style={{
-                margin: '14px 0 8px',
-                fontSize: 32,
-                lineHeight: 1,
-                color: '#fff7ed',
-              }}
-            >
-              Regulated Agile
-            </h1>
-            <p
-              style={{
-                margin: 0,
-                lineHeight: 1.6,
-                color: 'rgba(255, 241, 222, 0.78)',
-              }}
-            >
-              Keep engineers moving, make risk visible, and leave a clean audit
-              trail behind every exception.
-            </p>
-          </div>
-
-          <nav style={{ display: 'grid', gap: 10 }}>
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
+              <div
                 style={{
-                  borderRadius: 18,
-                  padding: '14px 16px',
-                  textDecoration: 'none',
-                  color: '#fff7ed',
+                  padding: 18,
+                  borderRadius: 24,
+                  background:
+                    'linear-gradient(135deg, rgba(201, 242, 251, 0.14), rgba(255,255,255,0.06))',
+                  border: '1px solid rgba(210, 244, 251, 0.12)',
+                  marginBottom: 22,
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 11,
+                    letterSpacing: '0.18em',
+                    textTransform: 'uppercase',
+                    color: 'rgba(218, 245, 250, 0.76)',
+                  }}
+                >
+                  Design History File Flow
+                </p>
+                <h1
+                  style={{
+                    margin: '14px 0 10px',
+                    fontSize: 30,
+                    lineHeight: 1.05,
+                    fontFamily:
+                      'var(--font-heading), var(--font-body), "Noto Sans TC", sans-serif',
+                  }}
+                >
+                  醫療器材研發
+                  <br />
+                  合規主控台
+                </h1>
+                <p
+                  style={{
+                    margin: 0,
+                    lineHeight: 1.75,
+                    color: 'rgba(223, 247, 252, 0.82)',
+                  }}
+                >
+                  讓 RD 可以敏捷推進，同時保留 QA 與 PM 所需的設計管制軌跡。
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+                {['ISO 13485', 'FDA Design Controls', 'Soft Gate'].map((item) => (
+                  <span
+                    key={item}
+                    style={{
+                      borderRadius: 999,
+                      padding: '7px 12px',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: '#dbf6fb',
+                      background: 'rgba(218, 244, 249, 0.12)',
+                      border: '1px solid rgba(218, 244, 249, 0.1)',
+                    }}
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+
+              <nav style={{ display: 'grid', gap: 10 }}>
+                {navItems.map((item) => (
+                  <ActiveNavLink
+                    key={item.href}
+                    href={item.href}
+                    label={item.label}
+                    caption={item.caption}
+                  />
+                ))}
+              </nav>
+
+              <div
+                style={{
+                  marginTop: 20,
+                  borderRadius: 22,
+                  padding: 16,
                   background: 'rgba(255,255,255,0.06)',
                   border: '1px solid rgba(255,255,255,0.08)',
                 }}
               >
-                <div style={{ fontWeight: 700, marginBottom: 4 }}>{item.label}</div>
-                <div style={{ fontSize: 13, color: 'rgba(255, 239, 217, 0.72)' }}>
-                  {item.caption}
+                <div style={{ fontSize: 12, color: 'rgba(223, 247, 252, 0.7)' }}>
+                  介面風格
                 </div>
-              </Link>
-            ))}
-          </nav>
-        </aside>
-
-        <main>
-          <header
-            style={{
-              borderRadius: 30,
-              padding: 28,
-              background:
-                'linear-gradient(135deg, rgba(255, 248, 238, 0.9), rgba(255, 239, 218, 0.55))',
-              border: '1px solid rgba(76, 53, 27, 0.12)',
-              boxShadow: '0 26px 80px rgba(57, 37, 16, 0.1)',
-              marginBottom: 22,
-            }}
-          >
-            <p
-              style={{
-                margin: 0,
-                textTransform: 'uppercase',
-                letterSpacing: '0.18em',
-                fontSize: 11,
-                color: '#896945',
-              }}
-            >
-              {eyebrow}
-            </p>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: 20,
-                flexWrap: 'wrap',
-                alignItems: 'flex-end',
-              }}
-            >
-              <div style={{ maxWidth: 760 }}>
-                <h2
+                <div
                   style={{
-                    margin: '10px 0 10px',
-                    fontSize: 'clamp(2.4rem, 5vw, 4.4rem)',
-                    lineHeight: 0.95,
-                    color: '#2f2418',
+                    marginTop: 6,
+                    fontWeight: 700,
+                    fontSize: 18,
+                    color: '#f2fbfc',
                   }}
                 >
-                  {title}
-                </h2>
+                  信任感 + 資料密度 + 可稽核
+                </div>
+                <div style={{ marginTop: 8, lineHeight: 1.7, color: 'rgba(223, 247, 252, 0.78)' }}>
+                  依據 `ui-ux-pro-max` 的醫療 / 企業儀表板建議，採用清爽藍綠配色、
+                  高對比資訊卡與明確狀態提示。
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          <main id="main-content">
+            <header
+              style={{
+                borderRadius: 32,
+                padding: 28,
+                background:
+                  'linear-gradient(135deg, rgba(255,255,255,0.95), rgba(242, 249, 251, 0.88))',
+                border: '1px solid var(--app-border)',
+                boxShadow: 'var(--app-shadow)',
+                marginBottom: 22,
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background:
+                    'radial-gradient(circle at right top, rgba(11, 137, 166, 0.12), transparent 32%), radial-gradient(circle at 18% 18%, rgba(191, 240, 248, 0.6), transparent 26%)',
+                  pointerEvents: 'none',
+                }}
+              />
+
+              <div style={{ position: 'relative' }}>
                 <p
                   style={{
                     margin: 0,
-                    fontSize: 18,
-                    lineHeight: 1.65,
-                    color: '#4a3925',
+                    fontSize: 11,
+                    letterSpacing: '0.18em',
+                    textTransform: 'uppercase',
+                    color: 'var(--app-primary-strong)',
                   }}
                 >
-                  {description}
+                  {eyebrow}
                 </p>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: 20,
+                    flexWrap: 'wrap',
+                    alignItems: 'flex-end',
+                  }}
+                >
+                  <div style={{ maxWidth: 860 }}>
+                    <h2
+                      style={{
+                        margin: '12px 0 10px',
+                        fontSize: 'clamp(2.3rem, 5vw, 4.6rem)',
+                        lineHeight: 0.92,
+                        color: 'var(--app-text)',
+                        fontFamily:
+                          'var(--font-heading), var(--font-body), "Noto Sans TC", sans-serif',
+                      }}
+                    >
+                      {title}
+                    </h2>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 18,
+                        lineHeight: 1.8,
+                        color: 'var(--app-text-soft)',
+                        maxWidth: 760,
+                      }}
+                    >
+                      {description}
+                    </p>
+                  </div>
+                  {actions ? <div>{actions}</div> : null}
+                </div>
               </div>
-              {actions ? <div>{actions}</div> : null}
-            </div>
-          </header>
+            </header>
 
-          {children}
-        </main>
+            {children}
+          </main>
+        </div>
       </div>
     </div>
   )
@@ -198,26 +263,37 @@ export function SectionCard({
   return (
     <section
       style={{
-        borderRadius: 26,
+        borderRadius: 28,
         padding: 22,
         background: isDark
-          ? 'rgba(72, 49, 26, 0.88)'
-          : 'rgba(255, 248, 239, 0.78)',
-        color: isDark ? '#fef6eb' : '#2f2418',
-        border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(73, 52, 27, 0.12)'}`,
+          ? 'linear-gradient(180deg, rgba(10, 73, 90, 0.96), rgba(8, 58, 72, 0.94))'
+          : 'var(--app-surface)',
+        color: isDark ? '#f2fbfc' : 'var(--app-text)',
+        border: isDark
+          ? '1px solid rgba(203, 241, 248, 0.12)'
+          : '1px solid var(--app-border)',
         boxShadow: isDark
-          ? '0 24px 60px rgba(49, 31, 15, 0.24)'
-          : '0 20px 60px rgba(57, 37, 16, 0.08)',
+          ? '0 24px 64px rgba(4, 31, 40, 0.22)'
+          : '0 18px 50px rgba(8, 41, 54, 0.08)',
       }}
     >
       <div style={{ marginBottom: 18 }}>
-        <h3 style={{ margin: 0, fontSize: 24 }}>{title}</h3>
+        <h3
+          style={{
+            margin: 0,
+            fontSize: 24,
+            fontFamily:
+              'var(--font-heading), var(--font-body), "Noto Sans TC", sans-serif',
+          }}
+        >
+          {title}
+        </h3>
         {subtitle ? (
           <p
             style={{
               margin: '6px 0 0',
-              color: isDark ? 'rgba(255, 241, 222, 0.76)' : '#675139',
-              lineHeight: 1.5,
+              color: isDark ? 'rgba(221, 245, 250, 0.78)' : 'var(--app-text-soft)',
+              lineHeight: 1.7,
             }}
           >
             {subtitle}
@@ -233,7 +309,7 @@ export function MetricCard({
   label,
   value,
   hint,
-  accent = '#6d4927',
+  accent = 'var(--app-primary-strong)',
 }: {
   label: string
   value: string
@@ -245,9 +321,9 @@ export function MetricCard({
       style={{
         borderRadius: 24,
         padding: 20,
-        background: 'rgba(255, 248, 239, 0.72)',
-        border: '1px solid rgba(73, 52, 27, 0.12)',
-        boxShadow: '0 18px 40px rgba(57, 37, 16, 0.08)',
+        background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(243, 249, 250, 0.94))',
+        border: '1px solid var(--app-border)',
+        boxShadow: '0 18px 42px rgba(8, 41, 54, 0.08)',
       }}
     >
       <div
@@ -255,15 +331,27 @@ export function MetricCard({
           textTransform: 'uppercase',
           letterSpacing: '0.14em',
           fontSize: 11,
-          color: '#896945',
+          color: 'var(--app-text-soft)',
           marginBottom: 8,
         }}
       >
         {label}
       </div>
-      <div style={{ fontSize: 34, fontWeight: 700, color: accent }}>{value}</div>
+      <div
+        style={{
+          fontSize: 36,
+          fontWeight: 700,
+          color: accent,
+          fontFamily:
+            'var(--font-heading), var(--font-body), "Noto Sans TC", sans-serif',
+        }}
+      >
+        {value}
+      </div>
       {hint ? (
-        <div style={{ marginTop: 8, lineHeight: 1.5, color: '#63503a' }}>{hint}</div>
+        <div style={{ marginTop: 8, lineHeight: 1.6, color: 'var(--app-text-soft)' }}>
+          {hint}
+        </div>
       ) : null}
     </div>
   )
@@ -278,12 +366,12 @@ export function StatusPill({
 }) {
   const palette =
     tone === 'good'
-      ? { background: 'rgba(59, 126, 75, 0.12)', color: '#2f6d3a' }
+      ? { background: 'rgba(11, 138, 99, 0.12)', color: 'var(--app-success)' }
       : tone === 'warn'
-        ? { background: 'rgba(173, 103, 45, 0.14)', color: '#8a4e22' }
+        ? { background: 'rgba(185, 113, 31, 0.12)', color: 'var(--app-accent)' }
         : tone === 'critical'
-          ? { background: 'rgba(155, 67, 59, 0.14)', color: '#8a2f2c' }
-          : { background: 'rgba(108, 90, 65, 0.12)', color: '#5d4a31' }
+          ? { background: 'rgba(191, 74, 60, 0.12)', color: 'var(--app-danger)' }
+          : { background: 'rgba(11, 99, 120, 0.1)', color: 'var(--app-primary-strong)' }
 
   return (
     <span
@@ -314,14 +402,24 @@ export function EmptyPanel({
     <div
       style={{
         borderRadius: 24,
-        padding: '32px 24px',
+        padding: '34px 24px',
         textAlign: 'center',
-        background: 'rgba(255,255,255,0.45)',
-        border: '1px dashed rgba(73, 52, 27, 0.18)',
+        background: 'var(--app-surface-soft)',
+        border: '1px dashed rgba(11, 99, 120, 0.2)',
       }}
     >
-      <h4 style={{ margin: '0 0 8px', fontSize: 22, color: '#3e2f1f' }}>{title}</h4>
-      <p style={{ margin: 0, lineHeight: 1.6, color: '#6b563f' }}>{body}</p>
+      <h4
+        style={{
+          margin: '0 0 8px',
+          fontSize: 22,
+          color: 'var(--app-text)',
+          fontFamily:
+            'var(--font-heading), var(--font-body), "Noto Sans TC", sans-serif',
+        }}
+      >
+        {title}
+      </h4>
+      <p style={{ margin: 0, lineHeight: 1.7, color: 'var(--app-text-soft)' }}>{body}</p>
     </div>
   )
 }
@@ -338,14 +436,16 @@ export function ActionLink({
   const style: CSSProperties =
     tone === 'primary'
       ? {
-          background: '#6b4927',
-          color: '#fff7ee',
-          border: '1px solid rgba(78, 54, 27, 0.1)',
+          background:
+            'linear-gradient(135deg, var(--app-primary), var(--app-primary-strong))',
+          color: '#f5fbfc',
+          border: '1px solid rgba(5, 86, 103, 0.14)',
+          boxShadow: '0 14px 30px rgba(11, 99, 120, 0.22)',
         }
       : {
-          background: 'rgba(255, 248, 239, 0.72)',
-          color: '#5a4329',
-          border: '1px solid rgba(73, 52, 27, 0.18)',
+          background: 'rgba(255, 255, 255, 0.78)',
+          color: 'var(--app-primary-strong)',
+          border: '1px solid var(--app-border)',
         }
 
   return (

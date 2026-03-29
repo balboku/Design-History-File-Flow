@@ -12,6 +12,7 @@ import {
   StatusPill,
 } from '@/components/app-shell'
 import { getProjectSummaries, getWorkspaceLookupData } from '@/lib/frontend-data'
+import { formatDateZh, formatProjectPhase, formatRole } from '@/lib/ui-labels'
 
 type SearchParams = Promise<{ notice?: string; error?: string }>
 
@@ -48,7 +49,7 @@ export default async function ProjectsPage({
     })
 
     if (result.success) {
-      redirect(buildUrl({ notice: `Project ${result.data.code} created` }))
+      redirect(buildUrl({ notice: `已建立專案 ${result.data.code}` }))
     }
 
     redirect(buildUrl({ error: result.error }))
@@ -64,10 +65,10 @@ export default async function ProjectsPage({
 
   return (
     <AppShell
-      eyebrow="Portfolio View"
-      title="Projects"
-      description="See every program at once, create a new regulated project record, and keep the portfolio moving without hiding compliance debt."
-      actions={<ActionLink href="/change-requests" label="Open Change Requests" />}
+      eyebrow="專案總覽"
+      title="專案組合"
+      description="從這裡建立新專案、查看每個產品的階段、進度與遺留項，讓專案經理在不犧牲合規軌跡的前提下維持團隊節奏。"
+      actions={<ActionLink href="/change-requests" label="查看變更管理" />}
     >
       {(urlState.notice || urlState.error) && (
         <div
@@ -94,40 +95,36 @@ export default async function ProjectsPage({
           marginBottom: 22,
         }}
       >
-        <MetricCard label="Total Projects" value={String(projects.length)} />
+        <MetricCard label="專案總數" value={String(projects.length)} />
         <MetricCard
-          label="Projects With Pending Items"
+          label="有遺留項的專案"
           value={String(openPendingProjects)}
-          accent="#8a2f2c"
+          accent="var(--app-danger)"
         />
         <MetricCard
-          label="Portfolio Task Completion"
+          label="任務完成總覽"
           value={portfolioDoneRate}
-          accent="#8a4e22"
+          accent="var(--app-accent)"
         />
         <MetricCard
-          label="Healthy Programs"
+          label="風險較低專案"
           value={String(projects.length - openPendingProjects)}
-          accent="#315f3a"
+          accent="var(--app-success)"
         />
       </div>
 
       <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1.15fr 0.85fr',
-          gap: 18,
-          marginBottom: 18,
-        }}
+        className="app-grid-2"
+        style={{ marginBottom: 18 }}
       >
         <SectionCard
-          title="Program Cards"
-          subtitle="Each card shows execution progress, compliance readiness, and risk residue."
+          title="專案卡片"
+          subtitle="每張卡片同時顯示研發進度、文件釋出狀態與軟關卡累積的遺留風險。"
         >
           {projects.length === 0 ? (
             <EmptyPanel
-              title="No projects yet"
-              body="Create your first project from the command panel on the right."
+              title="尚未建立任何專案"
+              body="可從右側表單直接建立第一個受設計管制管理的專案。"
             />
           ) : (
             <div
@@ -158,13 +155,13 @@ export default async function ProjectsPage({
                     {project.name}
                   </div>
                   <p style={{ margin: '0 0 14px', lineHeight: 1.55, color: '#5d4a31' }}>
-                    {project.description ?? 'No project description yet.'}
+                    {project.description ?? '尚未填寫專案描述。'}
                   </p>
 
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-                    <StatusPill label={project.currentPhase} tone="neutral" />
+                    <StatusPill label={formatProjectPhase(project.currentPhase)} tone="neutral" />
                     <StatusPill
-                      label={`${project.openPendingItemCount} pending`}
+                      label={`遺留 ${project.openPendingItemCount} 項`}
                       tone={project.openPendingItemCount > 0 ? 'critical' : 'good'}
                     />
                   </div>
@@ -178,18 +175,15 @@ export default async function ProjectsPage({
                     }}
                   >
                     <div>
-                      <strong>{project.doneTaskCount}</strong> / {project.taskCount} tasks done
+                      任務完成 <strong>{project.doneTaskCount}</strong> / {project.taskCount}
                     </div>
                     <div>
-                      <strong>{project.releasedDeliverableCount}</strong> /{' '}
-                      {project.deliverableCount} deliverables released
+                      文件釋出 <strong>{project.releasedDeliverableCount}</strong> /{' '}
+                      {project.deliverableCount}
                     </div>
-                    <div>Owner: {project.ownerName ?? 'Unassigned'}</div>
+                    <div>負責人：{project.ownerName ?? '尚未指派'}</div>
                     <div>
-                      Created:{' '}
-                      {new Intl.DateTimeFormat('zh-TW', { dateStyle: 'medium' }).format(
-                        project.createdAt,
-                      )}
+                      建立於：{formatDateZh(project.createdAt)}
                     </div>
                   </div>
                 </a>
@@ -199,35 +193,35 @@ export default async function ProjectsPage({
         </SectionCard>
 
         <SectionCard
-          title="Create Project"
-          subtitle="Stand up a new regulated program record without leaving the portfolio board."
+          title="建立專案"
+          subtitle="直接在專案總覽新增受法規控管的產品專案，不必切換頁面。"
           tone="dark"
         >
           <form action={createProjectForm} style={{ display: 'grid', gap: 10 }}>
-            <input name="code" placeholder="Project code" style={darkInputStyle} />
-            <input name="name" placeholder="Project name" style={darkInputStyle} />
+            <input name="code" placeholder="專案代碼" style={darkInputStyle} />
+            <input name="name" placeholder="專案名稱" style={darkInputStyle} />
             <textarea
               name="description"
-              placeholder="Short project description"
+              placeholder="專案摘要"
               style={{ ...darkInputStyle, minHeight: 100, resize: 'vertical' }}
             />
             <select name="currentPhase" defaultValue={ProjectPhase.Concept} style={darkInputStyle}>
               {Object.values(ProjectPhase).map((phase) => (
                 <option key={phase} value={phase}>
-                  {phase}
+                  {formatProjectPhase(phase)}
                 </option>
               ))}
             </select>
             <select name="ownerId" defaultValue="" style={darkInputStyle}>
-              <option value="">Assign PM owner later</option>
+              <option value="">稍後再指派專案經理</option>
               {ownerOptions.map((user) => (
                 <option key={user.id} value={user.id}>
-                  {user.name} · {user.role}
+                  {user.name} · {formatRole(user.role)}
                 </option>
               ))}
             </select>
             <button type="submit" style={lightButtonStyle}>
-              Create Project
+              建立專案
             </button>
           </form>
         </SectionCard>

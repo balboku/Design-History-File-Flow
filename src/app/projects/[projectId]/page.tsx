@@ -22,6 +22,16 @@ import {
   StatusPill,
 } from '@/components/app-shell'
 import { getProjectDetail, getWorkspaceLookupData } from '@/lib/frontend-data'
+import {
+  formatAdvanceOutcome,
+  formatChangeRequestStatus,
+  formatDateTimeZh,
+  formatDeliverableStatus,
+  formatPendingItemStatus,
+  formatProjectPhase,
+  formatRole,
+  formatTaskStatus,
+} from '@/lib/ui-labels'
 
 type Params = Promise<{ projectId: string }>
 type SearchParams = Promise<{ notice?: string; error?: string }>
@@ -36,7 +46,7 @@ function buildUrl(projectId: string, params: { notice?: string; error?: string }
 
 function formatFileSize(value: number | null) {
   if (!value || value <= 0) {
-    return 'Unknown size'
+    return '大小未知'
   }
 
   if (value < 1024) {
@@ -67,14 +77,14 @@ export default async function ProjectDetailPage({
   if (!data) {
     return (
       <AppShell
-        eyebrow="Project Detail"
-        title="Project Not Found"
-        description="The requested project record does not exist."
-        actions={<ActionLink href="/projects" label="Back to Projects" />}
+        eyebrow="專案詳情"
+        title="找不到此專案"
+        description="系統中不存在你要查看的專案紀錄。"
+        actions={<ActionLink href="/projects" label="返回專案總覽" />}
       >
         <EmptyPanel
-          title="Missing project"
-          body="Double-check the project id or return to the portfolio board."
+          title="專案不存在"
+          body="請重新確認專案 ID，或回到專案總覽重新選擇。"
         />
       </AppShell>
     )
@@ -97,7 +107,7 @@ export default async function ProjectDetailPage({
     })
 
     if (result.success) {
-      redirect(buildUrl(projectId, { notice: `Task ${result.data.code} created` }))
+      redirect(buildUrl(projectId, { notice: `已建立任務 ${result.data.code}` }))
     }
 
     redirect(buildUrl(projectId, { error: result.error }))
@@ -110,7 +120,7 @@ export default async function ProjectDetailPage({
     const result = await completeTaskAction(taskId)
 
     if (result.success) {
-      redirect(buildUrl(projectId, { notice: `Task ${result.data.id.slice(0, 8)} completed` }))
+      redirect(buildUrl(projectId, { notice: `任務 ${result.data.id.slice(0, 8)} 已完成` }))
     }
 
     redirect(buildUrl(projectId, { error: result.error }))
@@ -132,7 +142,7 @@ export default async function ProjectDetailPage({
     })
 
     if (result.success) {
-      redirect(buildUrl(projectId, { notice: `Phase result: ${result.outcome}` }))
+      redirect(buildUrl(projectId, { notice: `階段結果：${formatAdvanceOutcome(result.outcome)}` }))
     }
 
     redirect(buildUrl(projectId, { error: result.message }))
@@ -152,7 +162,7 @@ export default async function ProjectDetailPage({
     })
 
     if (result.success) {
-      redirect(buildUrl(projectId, { notice: `Deliverable ${result.data.code} created` }))
+      redirect(buildUrl(projectId, { notice: `已建立文件 ${result.data.code}` }))
     }
 
     redirect(buildUrl(projectId, { error: result.error }))
@@ -169,7 +179,7 @@ export default async function ProjectDetailPage({
     if (result.success) {
       redirect(
         buildUrl(projectId, {
-          notice: `Deliverable ${result.data.code} moved to ${result.data.status}`,
+          notice: `文件 ${result.data.code} 已更新為 ${formatDeliverableStatus(result.data.status)}`,
         }),
       )
     }
@@ -191,9 +201,9 @@ export default async function ProjectDetailPage({
       title={project.name}
       description={
         project.description ??
-        'Project workbench with execution, deliverables, phase gate posture, pending-item control, and change visibility.'
+        '這是專案主工作台，可直接操作階段推進、任務、文件、遺留項與變更單。'
       }
-      actions={<ActionLink href="/projects" label="Back to Projects" tone="secondary" />}
+      actions={<ActionLink href="/projects" label="返回專案總覽" tone="secondary" />}
     >
       {(urlState.notice || urlState.error) && (
         <div
@@ -222,21 +232,21 @@ export default async function ProjectDetailPage({
           marginBottom: 22,
         }}
       >
-        <MetricCard label="Current Phase" value={project.currentPhase} />
+        <MetricCard label="當前階段" value={formatProjectPhase(project.currentPhase)} />
         <MetricCard
-          label="Tasks Done"
+          label="已完成任務"
           value={`${doneTasks}/${project.tasks.length}`}
-          accent="#8a4e22"
+          accent="var(--app-accent)"
         />
         <MetricCard
-          label="Released Deliverables"
+          label="已釋出文件"
           value={`${releasedDeliverables}/${project.deliverables.length}`}
-          accent="#315f3a"
+          accent="var(--app-success)"
         />
         <MetricCard
-          label="Open Pending Items"
+          label="未結遺留項"
           value={String(openPendingItems)}
-          accent={openPendingItems > 0 ? '#8a2f2c' : '#315f3a'}
+          accent={openPendingItems > 0 ? 'var(--app-danger)' : 'var(--app-success)'}
         />
       </div>
 
@@ -249,17 +259,17 @@ export default async function ProjectDetailPage({
         }}
       >
         <SectionCard
-          title="Phase Gate Control"
-          subtitle="Review whether the next phase can be reached normally, or whether you are about to take a managed exception."
+          title="階段關卡控制"
+          subtitle="先確認文件是否齊全，再決定是正常推進，或以條件式放行進入下一階段。"
         >
           {gate?.canAdvance ? (
             <>
               <div style={{ marginBottom: 14 }}>
-                <StatusPill label={`Next phase: ${gate.nextPhase}`} tone="good" />
+                <StatusPill label={`下一階段：${formatProjectPhase(gate.nextPhase)}`} tone="good" />
               </div>
               <form action={advanceProject}>
                 <button type="submit" style={buttonStyle}>
-                  Advance Phase
+                  推進階段
                 </button>
               </form>
             </>
@@ -267,10 +277,10 @@ export default async function ProjectDetailPage({
             <>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
                 <StatusPill
-                  label={gate.isHardGate ? 'Hard Gate' : 'Soft Gate Warning'}
+                  label={gate.isHardGate ? '硬關卡' : '軟關卡警示'}
                   tone={gate.isHardGate ? 'critical' : 'warn'}
                 />
-                <StatusPill label={`${gate.issues.length} issue(s)`} tone="neutral" />
+                <StatusPill label={`問題 ${gate.issues.length} 項`} tone="neutral" />
               </div>
               <div style={{ display: 'grid', gap: 10, marginBottom: 16 }}>
                 {gate.issues.map((issue) => (
@@ -291,56 +301,56 @@ export default async function ProjectDetailPage({
                 <form action={advanceProject} style={{ display: 'grid', gap: 10 }}>
                   <input type="hidden" name="forceOverride" value="true" />
                   <select name="overriddenById" defaultValue="" style={inputStyle}>
-                    <option value="">Select approver</option>
+                    <option value="">選擇放行核准者</option>
                     {lookup.users
                       .filter((user) => user.role === Role.PM || user.role === Role.ADMIN)
                       .map((user) => (
                         <option key={user.id} value={user.id}>
-                          {user.name} · {user.role}
+                          {user.name} · {formatRole(user.role)}
                         </option>
                       ))}
                   </select>
                   <textarea
                     name="rationale"
-                    placeholder="Override rationale"
+                    placeholder="條件式放行原因"
                     style={{ ...inputStyle, minHeight: 110, resize: 'vertical' }}
                   />
                   <button type="submit" style={buttonStyle}>
-                    Proceed With Exceptions
+                    條件式放行
                   </button>
                 </form>
               ) : null}
             </>
           ) : (
             <EmptyPanel
-              title="Gate unavailable"
-              body="The gate could not be evaluated for this project."
+              title="關卡暫時無法評估"
+              body="系統目前無法判斷此專案是否可推進到下一階段。"
             />
           )}
         </SectionCard>
 
         <SectionCard
-          title="Create Task"
-          subtitle="Phase-independent task planning means engineers can start future-phase work without waiting for formal promotion."
+          title="建立任務"
+          subtitle="開發任務與專案當前階段刻意脫鉤，讓研發可提前規劃未來階段工作，但系統仍會把風險顯示出來。"
           tone="dark"
         >
           <form action={createTaskForm} style={{ display: 'grid', gap: 10 }}>
-            <input name="code" placeholder="Task code" style={inputStyleDark} />
-            <input name="title" placeholder="Task title" style={inputStyleDark} />
+            <input name="code" placeholder="任務代碼" style={inputStyleDark} />
+            <input name="title" placeholder="任務名稱" style={inputStyleDark} />
             <textarea
               name="description"
-              placeholder="Task description"
+              placeholder="任務描述"
               style={{ ...inputStyleDark, minHeight: 88, resize: 'vertical' }}
             />
             <select name="plannedPhase" defaultValue={project.currentPhase} style={inputStyleDark}>
               {Object.values(ProjectPhase).map((phase) => (
                 <option key={phase} value={phase}>
-                  {phase}
+                  {formatProjectPhase(phase)}
                 </option>
               ))}
             </select>
             <select name="assigneeId" defaultValue="" style={inputStyleDark}>
-              <option value="">Assign RD later</option>
+              <option value="">稍後再指派 RD</option>
               {rdUsers.map((user) => (
                 <option key={user.id} value={user.id}>
                   {user.name}
@@ -348,10 +358,10 @@ export default async function ProjectDetailPage({
               ))}
             </select>
             <select name="createdById" defaultValue="" style={inputStyleDark}>
-              <option value="">Created by system / current user</option>
+              <option value="">由系統 / 目前使用者建立</option>
               {lookup.users.map((user) => (
                 <option key={user.id} value={user.id}>
-                  {user.name} · {user.role}
+                  {user.name} · {formatRole(user.role)}
                 </option>
               ))}
             </select>
@@ -368,7 +378,7 @@ export default async function ProjectDetailPage({
               ))}
             </select>
             <button type="submit" style={buttonStyleLight}>
-              Create Traceable Task
+              建立可追溯任務
             </button>
           </form>
         </SectionCard>
@@ -383,11 +393,11 @@ export default async function ProjectDetailPage({
         }}
       >
         <SectionCard
-          title="Tasks"
-          subtitle="Execution work with planned phase versus current project phase kept intentionally separate."
+          title="開發任務"
+          subtitle="任務允許先於專案當前階段啟動，系統只提示風險，不會把 RD 的實際工作直接鎖死。"
         >
           {project.tasks.length === 0 ? (
-            <EmptyPanel title="No tasks yet" body="Create the first task from the panel on the right." />
+            <EmptyPanel title="尚無任務" body="可從右側表單建立第一筆可追溯的 RD 任務。" />
           ) : (
             <div style={{ display: 'grid', gap: 12 }}>
               {project.tasks.map((task) => (
@@ -413,7 +423,7 @@ export default async function ProjectDetailPage({
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       <StatusPill
-                        label={task.status}
+                        label={formatTaskStatus(task.status)}
                         tone={
                           task.status === 'Done'
                             ? 'good'
@@ -423,26 +433,26 @@ export default async function ProjectDetailPage({
                         }
                       />
                       <StatusPill
-                        label={`Planned ${task.plannedPhase}`}
+                        label={`預計階段 ${formatProjectPhase(task.plannedPhase)}`}
                         tone={task.plannedPhase !== project.currentPhase ? 'warn' : 'neutral'}
                       />
                     </div>
                   </div>
                   <div style={{ marginTop: 10, color: '#65513a', lineHeight: 1.6 }}>
-                    {task.description ?? 'No task description.'}
+                    {task.description ?? '尚未填寫任務描述。'}
                   </div>
                   <div style={{ marginTop: 10, color: '#5b452c' }}>
-                    Deliverables:{' '}
+                    綁定文件：
                     {task.deliverableLinks.map((link) => link.deliverable.code).join(', ')}
                   </div>
                   <div style={{ marginTop: 8, color: '#5b452c' }}>
-                    Assignee: {task.assignee?.name ?? 'Unassigned'}
+                    指派給：{task.assignee?.name ?? '未指派'}
                   </div>
                   {task.status !== 'Done' ? (
                     <form action={completeTaskForm} style={{ marginTop: 12 }}>
                       <input type="hidden" name="taskId" value={task.id} />
                       <button type="submit" style={buttonStyle}>
-                        Mark Done
+                        標記完成
                       </button>
                     </form>
                   ) : null}
@@ -453,52 +463,52 @@ export default async function ProjectDetailPage({
         </SectionCard>
 
         <SectionCard
-          title="Create Deliverable"
-          subtitle="Add the next compliance output placeholder, assign QA ownership, and define which phase gate it belongs to."
+          title="建立文件空殼"
+          subtitle="新增下一份法規文件、指派 QA 負責人，並定義它屬於哪一個階段關卡。"
           tone="dark"
         >
           <form action={createDeliverableForm} style={{ display: 'grid', gap: 10 }}>
-            <input name="code" placeholder="Deliverable code" style={inputStyleDark} />
-            <input name="title" placeholder="Deliverable title" style={inputStyleDark} />
+            <input name="code" placeholder="文件代碼" style={inputStyleDark} />
+            <input name="title" placeholder="文件名稱" style={inputStyleDark} />
             <textarea
               name="description"
-              placeholder="Deliverable description"
+              placeholder="文件說明"
               style={{ ...inputStyleDark, minHeight: 88, resize: 'vertical' }}
             />
             <select name="phase" defaultValue={project.currentPhase} style={inputStyleDark}>
               {Object.values(ProjectPhase).map((phase) => (
                 <option key={phase} value={phase}>
-                  {phase}
+                  {formatProjectPhase(phase)}
                 </option>
               ))}
             </select>
             <select name="ownerId" defaultValue="" style={inputStyleDark}>
-              <option value="">Assign QA owner later</option>
+              <option value="">稍後再指定 QA 負責人</option>
               {qaUsers.map((user) => (
                 <option key={user.id} value={user.id}>
-                  {user.name} · {user.role}
+                  {user.name} · {formatRole(user.role)}
                 </option>
               ))}
             </select>
             <label style={{ display: 'flex', gap: 10, alignItems: 'center', color: '#fff7ec' }}>
               <input type="checkbox" name="isRequired" value="true" defaultChecked />
-              Required for gate review
+              納入關卡審查
             </label>
             <button type="submit" style={buttonStyleLight}>
-              Create Deliverable
+              建立文件空殼
             </button>
           </form>
         </SectionCard>
       </div>
 
       <SectionCard
-        title="Deliverables"
-        subtitle="Manage file revisions, QA release state, and the items that are still carrying work-at-risk debt."
+        title="合規文件"
+        subtitle="集中管理檔案版次、QA 釋出狀態，以及因條件式放行而留下的風險債務。"
       >
         {project.deliverables.length === 0 ? (
           <EmptyPanel
-            title="No deliverables yet"
-            body="Create the first placeholder from the panel above to start linking tasks and revisions."
+            title="尚無文件空殼"
+            body="先從上方建立第一份文件，之後就能綁定任務與版次。"
           />
         ) : (
           <div style={{ display: 'grid', gap: 14 }}>
@@ -524,13 +534,13 @@ export default async function ProjectDetailPage({
                     <div style={{ fontSize: 12, color: '#896945' }}>{deliverable.code}</div>
                     <div style={{ fontSize: 22, fontWeight: 700 }}>{deliverable.title}</div>
                     <div style={{ marginTop: 8, color: '#5b452c' }}>
-                      Owner: {deliverable.owner?.name ?? 'Unassigned'} · Revisions:{' '}
-                      {deliverable.fileRevisions.length} · Pending links: {deliverable.pendingItems.length}
+                      負責人：{deliverable.owner?.name ?? '未指派'} · 版次：
+                      {deliverable.fileRevisions.length} · 關聯遺留項：{deliverable.pendingItems.length}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <StatusPill
-                      label={deliverable.status}
+                      label={formatDeliverableStatus(deliverable.status)}
                       tone={
                         deliverable.status === 'Released'
                           ? 'good'
@@ -539,12 +549,12 @@ export default async function ProjectDetailPage({
                             : 'warn'
                       }
                     />
-                    <StatusPill label={deliverable.phase} tone="neutral" />
+                    <StatusPill label={formatProjectPhase(deliverable.phase)} tone="neutral" />
                   </div>
                 </div>
 
                 <div style={{ marginBottom: 14 }}>
-                  <div style={fieldLabelStyle}>Stored revisions</div>
+                  <div style={fieldLabelStyle}>已登記版次</div>
                   {deliverable.fileRevisions.length === 0 ? (
                     <div
                       style={{
@@ -555,7 +565,7 @@ export default async function ProjectDetailPage({
                         color: '#6d5942',
                       }}
                     >
-                      No uploaded files yet.
+                      尚未上傳任何檔案。
                     </div>
                   ) : (
                     <div
@@ -611,7 +621,7 @@ export default async function ProjectDetailPage({
                     encType="multipart/form-data"
                     style={{ display: 'grid', gap: 10 }}
                   >
-                    <div style={fieldLabelStyle}>Log file revision</div>
+                    <div style={fieldLabelStyle}>登記檔案版次</div>
                     <div
                       style={{
                         display: 'grid',
@@ -624,19 +634,19 @@ export default async function ProjectDetailPage({
                         name="revisionNumber"
                         type="number"
                         min="1"
-                        placeholder="Revision number (optional)"
+                        placeholder="版次號（可選）"
                         style={inputStyle}
                       />
                       <select name="uploadedById" defaultValue="" style={inputStyle}>
-                        <option value="">Uploader</option>
+                        <option value="">上傳者</option>
                         {lookup.users.map((user) => (
                           <option key={user.id} value={user.id}>
-                            {user.name} · {user.role}
+                            {user.name} · {formatRole(user.role)}
                           </option>
                         ))}
                       </select>
                       <select name="changeRequestId" defaultValue="" style={inputStyle}>
-                        <option value="">Link change request later</option>
+                        <option value="">稍後再關聯變更單</option>
                         {project.changeRequests.map((changeRequest) => (
                           <option key={changeRequest.id} value={changeRequest.id}>
                             {changeRequest.code} · {changeRequest.title}
@@ -646,27 +656,27 @@ export default async function ProjectDetailPage({
                     </div>
                     <textarea
                       name="changeSummary"
-                      placeholder="Revision summary"
+                      placeholder="此次版更摘要"
                       style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }}
                     />
                     <button type="submit" style={buttonStyle}>
-                      Upload Revision
+                      上傳版次
                     </button>
                     <div style={{ color: '#6c573f', lineHeight: 1.5 }}>
-                      Locked deliverables require a linked change request before a new file can be uploaded.
+                      若文件已鎖定，必須先關聯變更單，才能上傳新的檔案版次。
                     </div>
                   </form>
 
                   <form action={updateDeliverableStatusForm} style={{ display: 'grid', gap: 10 }}>
                     <input type="hidden" name="deliverableId" value={deliverable.id} />
-                    <div style={fieldLabelStyle}>QA status control</div>
+                    <div style={fieldLabelStyle}>QA 狀態控制</div>
                     <button
                       type="submit"
                       name="status"
                       value={DeliverableStatus.Draft}
                       style={secondaryButtonStyle}
                     >
-                      Set Draft
+                      設為草稿
                     </button>
                     <button
                       type="submit"
@@ -674,7 +684,7 @@ export default async function ProjectDetailPage({
                       value={DeliverableStatus.Released}
                       style={buttonStyle}
                     >
-                      Set Released
+                      設為已釋出
                     </button>
                     <button
                       type="submit"
@@ -682,7 +692,7 @@ export default async function ProjectDetailPage({
                       value={DeliverableStatus.Locked}
                       style={criticalButtonStyle}
                     >
-                      Lock Deliverable
+                      鎖定文件
                     </button>
                   </form>
                 </div>
@@ -693,15 +703,15 @@ export default async function ProjectDetailPage({
       </SectionCard>
 
       <SectionCard
-        title="Pending Items, Audit, and Changes"
-        subtitle="Every conditional go remains visible until it is explicitly closed, and post-transfer changes stay attached to the project record."
+        title="遺留項、稽核軌跡與變更單"
+        subtitle="每一次條件式放行都會留下軌跡，直到明確結案；設計移轉後的變更也會持續掛在專案紀錄上。"
       >
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 18 }}>
           <div style={{ display: 'grid', gap: 12 }}>
             {project.pendingItems.length === 0 ? (
               <EmptyPanel
-                title="No pending items"
-                body="This project currently has no open or historical carryovers."
+                title="沒有遺留項"
+                body="此專案目前沒有未結或歷史遺留項。"
               />
             ) : (
               project.pendingItems.map((item) => (
@@ -723,7 +733,7 @@ export default async function ProjectDetailPage({
                   >
                     <strong>{item.title}</strong>
                     <StatusPill
-                      label={item.status}
+                      label={formatPendingItemStatus(item.status)}
                       tone={item.status === 'Resolved' ? 'good' : 'critical'}
                     />
                   </div>
@@ -754,19 +764,17 @@ export default async function ProjectDetailPage({
                   }}
                 >
                   <strong>
-                    {transition.fromPhase} → {transition.toPhase}
+                    {formatProjectPhase(transition.fromPhase)} →{' '}
+                    {formatProjectPhase(transition.toPhase)}
                   </strong>
                   <StatusPill
-                    label={transition.wasOverride ? 'Override' : 'Normal'}
+                    label={transition.wasOverride ? '條件式放行' : '正常推進'}
                     tone={transition.wasOverride ? 'warn' : 'good'}
                   />
                 </div>
                 <div style={{ marginTop: 8, color: '#5f4a34' }}>
-                  Triggered by {transition.triggeredBy?.name ?? 'System'} ·{' '}
-                  {new Intl.DateTimeFormat('zh-TW', {
-                    dateStyle: 'medium',
-                    timeStyle: 'short',
-                  }).format(transition.createdAt)}
+                  觸發者：{transition.triggeredBy?.name ?? '系統'} ·{' '}
+                  {formatDateTimeZh(transition.createdAt)}
                 </div>
               </div>
             ))}
@@ -775,8 +783,8 @@ export default async function ProjectDetailPage({
           <div style={{ display: 'grid', gap: 12 }}>
             {project.changeRequests.length === 0 ? (
               <EmptyPanel
-                title="No change requests"
-                body="Post-transfer change control will appear here once the first CR is logged."
+                title="沒有變更單"
+                body="第一張 CR 建立後，設計移轉後的變更控制就會顯示在這裡。"
               />
             ) : (
               project.changeRequests.map((changeRequest) => (
@@ -800,7 +808,7 @@ export default async function ProjectDetailPage({
                       {changeRequest.code} · {changeRequest.title}
                     </strong>
                     <StatusPill
-                      label={changeRequest.status}
+                      label={formatChangeRequestStatus(changeRequest.status)}
                       tone={
                         changeRequest.status === 'Approved' || changeRequest.status === 'Implemented'
                           ? 'good'
@@ -811,15 +819,15 @@ export default async function ProjectDetailPage({
                     />
                   </div>
                   <div style={{ marginTop: 8, color: '#5f4a34' }}>
-                    Requester: {changeRequest.requester?.name ?? 'Unassigned'}
+                    提出者：{changeRequest.requester?.name ?? '未指派'}
                   </div>
                   <div style={{ marginTop: 8, color: '#5f4a34' }}>
-                    Linked deliverables:{' '}
+                    關聯文件：
                     {changeRequest.deliverableLinks.length > 0
                       ? changeRequest.deliverableLinks
                           .map((link) => link.deliverable.code)
                           .join(', ')
-                      : 'None'}
+                      : '無'}
                   </div>
                 </div>
               ))

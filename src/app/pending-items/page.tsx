@@ -11,6 +11,12 @@ import {
 } from '@/components/app-shell'
 import { getProjectSummaries } from '@/lib/frontend-data'
 import {
+  formatDateTimeZh,
+  formatDeliverableStatus,
+  formatPendingItemStatus,
+  formatProjectPhase,
+} from '@/lib/ui-labels'
+import {
   listProjectPendingItems,
   resolvePendingItem,
 } from '@/lib/pending-item-service'
@@ -73,7 +79,7 @@ export default async function PendingItemsPage({
         buildPageUrl({
           projectId: formProjectId,
           status: formStatus || undefined,
-          notice: 'Pending item 已成功結案',
+          notice: '遺留項已成功結案',
         }),
       )
     } catch (err) {
@@ -92,9 +98,9 @@ export default async function PendingItemsPage({
 
   return (
     <AppShell
-      eyebrow="Soft Gate Ops"
-      title="Pending Items"
-      description="Review every controlled exception created by phase override decisions, close the carryover when the linked deliverable is truly released, and keep the audit trail visible."
+      eyebrow="條件式放行追蹤"
+      title="遺留項管理"
+      description="每一次條件式放行都會留下遺留項。這裡用來確認哪些例外仍未補齊，以及哪些項目已因文件已釋出而可以正式結案。"
     >
       {(notice || error) && (
         <div
@@ -120,12 +126,12 @@ export default async function PendingItemsPage({
         }}
       >
         <SectionCard
-          title="Pending Query"
-          subtitle="Pick a project to inspect open exceptions and historical carryovers."
+          title="查詢條件"
+          subtitle="選擇專案後，可查看該專案所有未結與歷史遺留項。"
         >
           <form method="GET" style={{ display: 'grid', gap: 10 }}>
             <select name="projectId" defaultValue={projectId} style={inputStyle}>
-              <option value="">Select a project</option>
+              <option value="">選擇專案</option>
               {projects.map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.code} · {project.name}
@@ -133,30 +139,30 @@ export default async function PendingItemsPage({
               ))}
             </select>
             <select name="status" defaultValue={status ?? ''} style={inputStyle}>
-              <option value="">All statuses</option>
-              <option value={PendingItemStatus.Open}>Open</option>
-              <option value={PendingItemStatus.Resolved}>Resolved</option>
+              <option value="">全部狀態</option>
+              <option value={PendingItemStatus.Open}>未結案</option>
+              <option value={PendingItemStatus.Resolved}>已補齊</option>
             </select>
             <button type="submit" style={primaryButtonStyle}>
-              Load Pending Items
+              載入遺留項
             </button>
           </form>
         </SectionCard>
 
         <SectionCard
-          title="What This Means"
-          subtitle="Soft gates keep teams moving, but unresolved exceptions remain visible until QA catches up."
+          title="規則說明"
+          subtitle="軟關卡讓團隊能前進，但每個例外都必須留下可追蹤的稽核痕跡。"
           tone="dark"
         >
           <div style={{ display: 'grid', gap: 12 }}>
             <div style={darkPanelStyle}>
-              `Open` means the override debt is still active and the deliverable is not fully released.
+              `未結案` 代表這筆條件式放行的風險仍在，綁定文件還沒有完整釋出。
             </div>
             <div style={darkPanelStyle}>
-              `Resolved` means the linked deliverable has reached `Released` and the exception can be closed.
+              `已補齊` 代表對應文件已達 `已釋出`，遺留項可以正式結案。
             </div>
             <div style={darkPanelStyle}>
-              The final `DesignTransfer` gate still blocks if any open carryovers remain.
+              到了 `設計移轉` 這道最終硬關卡，只要還有未結遺留項，就不允許放行。
             </div>
           </div>
         </SectionCard>
@@ -173,23 +179,23 @@ export default async function PendingItemsPage({
             }}
           >
             <MetricCard
-              label="Project"
+              label="專案"
               value={selectedProject?.code ?? projectId.slice(0, 8)}
-              hint={selectedProject?.name ?? 'Selected project'}
+              hint={selectedProject?.name ?? '已選專案'}
             />
-            <MetricCard label="Total Items" value={String(items.length)} />
-            <MetricCard label="Open" value={String(openCount)} accent="#8a2f2c" />
-            <MetricCard label="Resolved" value={String(resolvedCount)} accent="#315f3a" />
+            <MetricCard label="總數" value={String(items.length)} />
+            <MetricCard label="未結案" value={String(openCount)} accent="var(--app-danger)" />
+            <MetricCard label="已補齊" value={String(resolvedCount)} accent="var(--app-success)" />
           </div>
 
           <SectionCard
-            title="Carryover Ledger"
-            subtitle="Each card shows the exception state, linked deliverable readiness, and whether the item is eligible to close."
+            title="遺留項台帳"
+            subtitle="每張卡片都會標示例外狀態、文件是否可結案，以及是哪一次階段異動產生的。"
           >
             {items.length === 0 ? (
               <EmptyPanel
-                title="No pending items found"
-                body="This project currently has no matching pending items for the selected filter."
+                title="查無符合條件的遺留項"
+                body="此專案在目前篩選條件下沒有對應的遺留項。"
               />
             ) : (
               <div style={{ display: 'grid', gap: 16 }}>
@@ -228,18 +234,18 @@ export default async function PendingItemsPage({
                             }}
                           >
                             <StatusPill
-                              label={item.status}
+                              label={formatPendingItemStatus(item.status)}
                               tone={
                                 item.status === PendingItemStatus.Open ? 'critical' : 'good'
                               }
                             />
                             <StatusPill
-                              label={`Deliverable ${item.deliverable.status}`}
+                              label={`文件：${formatDeliverableStatus(item.deliverable.status)}`}
                               tone={
                                 item.deliverable.status === 'Released' ? 'good' : 'warn'
                               }
                             />
-                            <StatusPill label={`Phase ${item.deliverable.phase}`} tone="neutral" />
+                            <StatusPill label={formatProjectPhase(item.deliverable.phase)} tone="neutral" />
                           </div>
                           <h2 style={{ margin: '0 0 8px', fontSize: 24 }}>{item.title}</h2>
                           <p style={{ margin: 0, color: '#5e4b35', lineHeight: 1.6 }}>
@@ -254,20 +260,16 @@ export default async function PendingItemsPage({
                             }}
                           >
                             <div>
-                              Deliverable: {item.deliverable.code} · {item.deliverable.title}
+                              文件：{item.deliverable.code} · {item.deliverable.title}
                             </div>
                             <div>
-                              Triggered by:{' '}
+                              來源關卡：{' '}
                               {item.sourceTransition
-                                ? `${item.sourceTransition.fromPhase} → ${item.sourceTransition.toPhase}`
-                                : 'Unknown transition'}
+                                ? `${formatProjectPhase(item.sourceTransition.fromPhase)} → ${formatProjectPhase(item.sourceTransition.toPhase)}`
+                                : '未知'}
                             </div>
                             <div>
-                              Created:{' '}
-                              {new Intl.DateTimeFormat('zh-TW', {
-                                dateStyle: 'medium',
-                                timeStyle: 'short',
-                              }).format(item.createdAt)}
+                              建立時間：{formatDateTimeZh(item.createdAt)}
                             </div>
                           </div>
                         </div>
@@ -286,7 +288,7 @@ export default async function PendingItemsPage({
                               cursor: canResolve ? 'pointer' : 'not-allowed',
                             }}
                           >
-                            Mark Resolved
+                            標記為已補齊
                           </button>
                           <p
                             style={{
@@ -296,8 +298,8 @@ export default async function PendingItemsPage({
                             }}
                           >
                             {canResolve
-                              ? 'The linked deliverable is released and can close this item.'
-                              : 'Release the linked deliverable before resolving this carryover.'}
+                              ? '綁定文件已釋出，可以將此遺留項結案。'
+                              : '請先讓綁定文件達到已釋出，再將此遺留項結案。'}
                           </p>
                         </form>
                       </div>
@@ -310,12 +312,12 @@ export default async function PendingItemsPage({
         </>
       ) : (
         <SectionCard
-          title="Select A Project"
-          subtitle="Choose a project to see pending-item history, resolution eligibility, and override residue."
+          title="先選擇專案"
+          subtitle="選定專案後，才能看到該專案所有條件式放行造成的遺留項與補齊情況。"
         >
           <EmptyPanel
-            title="No project selected"
-            body="Use the query panel above to load a project-specific pending-item ledger."
+            title="尚未指定專案"
+            body="請從上方查詢條件選擇專案後，再載入遺留項台帳。"
           />
         </SectionCard>
       )}

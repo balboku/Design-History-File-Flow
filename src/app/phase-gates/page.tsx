@@ -1,21 +1,22 @@
 import { AppShell, EmptyPanel, SectionCard, StatusPill } from '@/components/app-shell'
 import { getPhaseGateBoardData } from '@/lib/frontend-data'
+import { formatProjectPhase } from '@/lib/ui-labels'
 
 export default async function PhaseGatesPage() {
   const items = await getPhaseGateBoardData()
 
   return (
     <AppShell
-      eyebrow="Gate Review"
-      title="Phase Gates"
-      description="See which projects can advance cleanly, which ones need exceptions, and which programs are blocked by the final hard gate."
+      eyebrow="階段關卡"
+      title="階段關卡盤點"
+      description="快速找出哪些專案可正常推進、哪些需要條件式放行，以及哪些專案已被最終硬關卡擋下。"
     >
       <SectionCard
-        title="Gate Status by Project"
-        subtitle="This board shows the same decision posture a PM would need before pushing phase progression."
+        title="各專案關卡狀態"
+        subtitle="這張看板模擬專案經理在推進階段前需要看到的決策資訊。"
       >
         {items.length === 0 ? (
-          <EmptyPanel title="No projects to evaluate" body="Create projects first, then this board will evaluate each gate." />
+          <EmptyPanel title="目前沒有可評估的專案" body="建立專案後，系統就會自動計算每個階段關卡狀態。" />
         ) : (
           <div style={{ display: 'grid', gap: 12 }}>
             {items.map(({ project, gate }) => {
@@ -43,16 +44,16 @@ export default async function PhaseGatesPage() {
                       <div style={{ fontSize: 24, fontWeight: 700 }}>{project.name}</div>
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <StatusPill label={project.currentPhase} tone="neutral" />
+                      <StatusPill label={formatProjectPhase(project.currentPhase)} tone="neutral" />
                       <StatusPill
                         label={
                           canAdvance
-                            ? 'Ready to advance'
+                            ? '可直接推進'
                             : 'error' in gate
-                              ? 'Evaluation error'
+                              ? '評估失敗'
                               : isHardGate
-                                ? 'Hard gate blocked'
-                                : 'Warning / override needed'
+                                ? '硬關卡阻擋'
+                                : '需警示 / 可條件放行'
                         }
                         tone={
                           canAdvance
@@ -63,7 +64,7 @@ export default async function PhaseGatesPage() {
                         }
                       />
                       {!canAdvance && !('error' in gate) ? (
-                        <StatusPill label={`${issueCount} issue(s)`} tone="neutral" />
+                        <StatusPill label={`問題 ${issueCount} 項`} tone="neutral" />
                       ) : null}
                     </div>
                   </div>

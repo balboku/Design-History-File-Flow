@@ -15,6 +15,10 @@ import {
   getChangeRequestBoardData,
   getWorkspaceLookupData,
 } from '@/lib/frontend-data'
+import {
+  formatChangeRequestStatus,
+  formatRole,
+} from '@/lib/ui-labels'
 
 type SearchParams = Promise<{ notice?: string; error?: string }>
 
@@ -55,7 +59,7 @@ export default async function ChangeRequestsPage({
     })
 
     if (result.success) {
-      redirect(buildUrl({ notice: `Change request ${result.data.code} created` }))
+      redirect(buildUrl({ notice: `已建立變更單 ${result.data.code}` }))
     }
 
     redirect(buildUrl({ error: result.error }))
@@ -73,10 +77,10 @@ export default async function ChangeRequestsPage({
 
   return (
     <AppShell
-      eyebrow="Post-Transfer Control"
-      title="Change Requests"
-      description="Capture design changes after transfer, tie them to affected projects, deliverables, and parts, and keep impact analysis attached to the record."
-      actions={<ActionLink href="/deliverables" label="Open Deliverables" />}
+      eyebrow="設計變更管理"
+      title="變更單管理"
+      description="設計移轉後的變更都應回到變更單流程中管理，並明確連結受影響的專案、文件與料件。"
+      actions={<ActionLink href="/deliverables" label="查看文件空殼" />}
     >
       {(urlState.notice || urlState.error) && (
         <div
@@ -105,44 +109,40 @@ export default async function ChangeRequestsPage({
           marginBottom: 22,
         }}
       >
-        <MetricCard label="Total CRs" value={String(changeRequests.length)} />
-        <MetricCard label="Active Review" value={String(activeCount)} accent="#8a4e22" />
-        <MetricCard label="Approved / Implemented" value={String(approvedCount)} accent="#315f3a" />
+        <MetricCard label="變更單總數" value={String(changeRequests.length)} />
+        <MetricCard label="審查中 / 進行中" value={String(activeCount)} accent="var(--app-accent)" />
+        <MetricCard label="已核准 / 已實施" value={String(approvedCount)} accent="var(--app-success)" />
         <MetricCard
-          label="Linked Parts"
+          label="可連結料件"
           value={String(lookup.parts.length)}
-          hint="Global reusable part library available for impact tagging"
+          hint="全域共用 Part/Component 庫"
         />
       </div>
 
       <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '0.95fr 1.05fr',
-          gap: 18,
-          marginBottom: 18,
-        }}
+        className="app-grid-2"
+        style={{ marginBottom: 18 }}
       >
         <SectionCard
-          title="Create Change Request"
-          subtitle="At least one of project, deliverable, or part must be linked to keep the request traceable."
+          title="建立變更單"
+          subtitle="至少要連結專案、文件或料件其中一種，才能保有完整的設計變更追溯。"
           tone="dark"
         >
           <form action={createChangeRequestForm} style={{ display: 'grid', gap: 10 }}>
-            <input name="code" placeholder="CR code" style={darkInputStyle} />
-            <input name="title" placeholder="CR title" style={darkInputStyle} />
+            <input name="code" placeholder="CR 編號" style={darkInputStyle} />
+            <input name="title" placeholder="變更單名稱" style={darkInputStyle} />
             <textarea
               name="description"
-              placeholder="Change description"
+              placeholder="變更內容說明"
               style={{ ...darkInputStyle, minHeight: 90, resize: 'vertical' }}
             />
             <textarea
               name="impactAnalysis"
-              placeholder="Impact analysis"
+              placeholder="影響評估"
               style={{ ...darkInputStyle, minHeight: 120, resize: 'vertical' }}
             />
             <select name="projectId" defaultValue="" style={darkInputStyle}>
-              <option value="">No project selected</option>
+              <option value="">尚未指定專案</option>
               {lookup.projects.map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.code} · {project.name}
@@ -150,17 +150,17 @@ export default async function ChangeRequestsPage({
               ))}
             </select>
             <select name="requesterId" defaultValue="" style={darkInputStyle}>
-              <option value="">Requester</option>
+              <option value="">提出人</option>
               {lookup.users.map((user) => (
                 <option key={user.id} value={user.id}>
-                  {user.name} · {user.role}
+                  {user.name} · {formatRole(user.role)}
                 </option>
               ))}
             </select>
             <select name="status" defaultValue={ChangeRequestStatus.Draft} style={darkInputStyle}>
               {Object.values(ChangeRequestStatus).map((status) => (
                 <option key={status} value={status}>
-                  {status}
+                  {formatChangeRequestStatus(status)}
                 </option>
               ))}
             </select>
@@ -189,37 +189,37 @@ export default async function ChangeRequestsPage({
               ))}
             </select>
             <button type="submit" style={lightButtonStyle}>
-              Create Change Request
+              建立變更單
             </button>
           </form>
         </SectionCard>
 
         <SectionCard
-          title="Control Notes"
-          subtitle="Use CRs to reopen controlled documents after design transfer without losing why the change was accepted."
+          title="設計原則"
+          subtitle="變更單（Change Request）不只是表單，而是設計移轉後唯一合法的變更入口。"
         >
           <div style={{ display: 'grid', gap: 12 }}>
             <div style={notePanelStyle}>
-              A CR can be linked directly to a project, one or more deliverables, or part numbers.
+              每張變更單可直接連結專案、單一或多個文件，或受影響料號。
             </div>
             <div style={notePanelStyle}>
-              Impact analysis stays embedded in the record so reviewers can understand why the revision happened.
+              影響評估會與變更單一起保存，讓審查人能理解為什麼需要升版。
             </div>
             <div style={notePanelStyle}>
-              File revisions can later point back to the CR to preserve post-transfer traceability.
+              後續檔案版次也可回指該變更單，補齊設計移轉後的追溯鏈。
             </div>
           </div>
         </SectionCard>
       </div>
 
       <SectionCard
-        title="Change Ledger"
-        subtitle="Review the current state of every change, who requested it, and which regulated objects are affected."
+        title="變更紀錄"
+        subtitle="檢視每一張變更單的狀態、提出人與受影響的受管制物件。"
       >
         {changeRequests.length === 0 ? (
           <EmptyPanel
-            title="No change requests yet"
-            body="Create the first CR from the panel above to start the post-transfer control log."
+            title="尚未建立變更單"
+            body="可從左側表單建立第一張變更單，開始移轉後變更管理。"
           />
         ) : (
           <div style={{ display: 'grid', gap: 12 }}>
@@ -248,7 +248,7 @@ export default async function ChangeRequestsPage({
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <StatusPill
-                      label={changeRequest.status}
+                      label={formatChangeRequestStatus(changeRequest.status)}
                       tone={
                         changeRequest.status === ChangeRequestStatus.Approved ||
                         changeRequest.status === ChangeRequestStatus.Implemented
@@ -264,23 +264,23 @@ export default async function ChangeRequestsPage({
                   </div>
                 </div>
                 <div style={{ color: '#5a4631', lineHeight: 1.6 }}>
-                  {changeRequest.description ?? 'No change description yet.'}
+                  {changeRequest.description ?? '尚未填寫變更內容。'}
                 </div>
                 <div style={{ marginTop: 10, color: '#5a4631' }}>
-                  Requester: {changeRequest.requester?.name ?? 'Unassigned'} · Deliverables:{' '}
+                  提出人：{changeRequest.requester?.name ?? '尚未指派'} · 影響文件：
                   {changeRequest.deliverableLinks.length > 0
                     ? changeRequest.deliverableLinks
                         .map((link) => `${link.deliverable.project.code}/${link.deliverable.code}`)
                         .join(', ')
-                    : 'None'}
+                    : '無'}
                 </div>
                 <div style={{ marginTop: 8, color: '#5a4631' }}>
-                  Parts:{' '}
+                  影響料件：
                   {changeRequest.partLinks.length > 0
                     ? changeRequest.partLinks
                         .map((link) => link.partComponent.partNumber)
                         .join(', ')
-                    : 'None'}
+                    : '無'}
                 </div>
               </div>
             ))}

@@ -1,9 +1,13 @@
 import { AppShell, EmptyPanel, SectionCard, StatusPill } from '@/components/app-shell'
 import { getDeliverableBoardData } from '@/lib/frontend-data'
+import {
+  formatDeliverableStatus,
+  formatProjectPhase,
+} from '@/lib/ui-labels'
 
 function formatFileSize(value: number | null) {
   if (!value || value <= 0) {
-    return 'Unknown size'
+    return '大小未知'
   }
 
   if (value < 1024) {
@@ -22,16 +26,16 @@ export default async function DeliverablesPage() {
 
   return (
     <AppShell
-      eyebrow="Compliance Outputs"
-      title="Deliverables"
-      description="Track the placeholder outputs that prove regulated work happened: file coverage, current status, linked tasks, and carryover risk."
+      eyebrow="合規文件總覽"
+      title="文件空殼總覽"
+      description="集中查看每個文件空殼的狀態、上傳版次、綁定任務與遺留項，讓 QA 與專案經理能快速掌握證據是否齊全。"
     >
       <SectionCard
-        title="Deliverable Registry"
-        subtitle="Each row shows whether evidence exists, whether QA has released it, and whether it still anchors a pending item."
+        title="文件註冊表"
+        subtitle="每一列都會顯示文件是否已有版次、是否已釋出，以及是否仍掛著遺留項。"
       >
         {deliverables.length === 0 ? (
-          <EmptyPanel title="No deliverables yet" body="Create deliverable placeholders in the database to populate this registry." />
+          <EmptyPanel title="尚未建立文件空殼" body="可先到專案頁建立文件空殼，這裡會自動匯總。" />
         ) : (
           <div style={{ display: 'grid', gap: 12 }}>
             {deliverables.map((deliverable) => (
@@ -53,7 +57,7 @@ export default async function DeliverablesPage() {
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <StatusPill
-                      label={deliverable.status}
+                      label={formatDeliverableStatus(deliverable.status)}
                       tone={
                         deliverable.status === 'Released'
                           ? 'good'
@@ -62,16 +66,17 @@ export default async function DeliverablesPage() {
                             : 'warn'
                       }
                     />
-                    <StatusPill label={deliverable.phase} tone="neutral" />
+                    <StatusPill label={formatProjectPhase(deliverable.phase)} tone="neutral" />
                     <StatusPill
-                      label={`${deliverable.pendingItems.length} pending`}
+                      label={`遺留 ${deliverable.pendingItems.length} 項`}
                       tone={deliverable.pendingItems.length > 0 ? 'critical' : 'good'}
                     />
                   </div>
                 </div>
                 <div style={{ marginTop: 10, color: '#5d4a31' }}>
-                  Revisions: {deliverable.fileRevisions.length} · Linked tasks:{' '}
-                  {deliverable.taskLinks.length} · Owner: {deliverable.owner?.name ?? 'Unassigned'}
+                  版次：{deliverable.fileRevisions.length} · 綁定任務：
+                  {deliverable.taskLinks.length} · QA 負責：
+                  {deliverable.owner?.name ?? '尚未指派'}
                 </div>
                 {deliverable.fileRevisions[0] ? (
                   <a
@@ -84,7 +89,7 @@ export default async function DeliverablesPage() {
                       fontWeight: 700,
                     }}
                   >
-                    Download latest revision · r{deliverable.fileRevisions[0].revisionNumber} ·{' '}
+                    下載最新版 · r{deliverable.fileRevisions[0].revisionNumber} ·{' '}
                     {formatFileSize(deliverable.fileRevisions[0].fileSizeBytes)}
                   </a>
                 ) : null}

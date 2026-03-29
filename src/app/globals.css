@@ -1,0 +1,162 @@
+:root {
+  --font-heading: "Avenir Next", "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --font-body: "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+  --app-bg: #eef9fb;
+  --app-bg-strong: #d9f0f5;
+  --app-surface: rgba(255, 255, 255, 0.92);
+  --app-surface-soft: rgba(241, 248, 250, 0.92);
+  --app-sidebar: rgba(7, 53, 67, 0.96);
+  --app-sidebar-soft: rgba(15, 79, 98, 0.96);
+  --app-text: #123847;
+  --app-text-soft: #5a7883;
+  --app-border: rgba(16, 79, 99, 0.12);
+  --app-primary: #0b89a6;
+  --app-primary-strong: #0b6378;
+  --app-accent: #b9711f;
+  --app-success: #0b8a63;
+  --app-danger: #bf4a3c;
+  --app-shadow: 0 26px 80px rgba(8, 41, 54, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--app-text);
+  background:
+    radial-gradient(circle at top left, rgba(201, 236, 242, 0.92), transparent 34%),
+    radial-gradient(circle at top right, rgba(213, 235, 252, 0.86), transparent 28%),
+    linear-gradient(180deg, #f8fcfd 0%, var(--app-bg) 48%, #dbeff3 100%);
+  font-family: var(--font-body), "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a,
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+a,
+button {
+  cursor: pointer;
+}
+
+a,
+button,
+input,
+select,
+textarea {
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    opacity 180ms ease;
+}
+
+:focus-visible {
+  outline: 3px solid rgba(11, 137, 166, 0.28);
+  outline-offset: 2px;
+}
+
+.skip-link {
+  position: fixed;
+  top: 14px;
+  left: 16px;
+  z-index: 9999;
+  transform: translateY(-220%);
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: #ffffff;
+  color: var(--app-primary-strong);
+  text-decoration: none;
+  box-shadow: 0 10px 30px rgba(8, 41, 54, 0.18);
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+.app-shell-grid {
+  display: grid;
+  grid-template-columns: 312px minmax(0, 1fr);
+  gap: 24px;
+}
+
+.app-shell-sidebar {
+  position: sticky;
+  top: 20px;
+  align-self: start;
+}
+
+.app-shell-header-grid,
+.app-grid-4,
+.app-grid-3,
+.app-grid-2 {
+  display: grid;
+  gap: 18px;
+}
+
+.app-grid-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.app-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.app-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 1200px) {
+  .app-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1024px) {
+  .app-shell-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-shell-sidebar {
+    position: static;
+  }
+
+  .app-grid-3,
+  .app-grid-2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .app-grid-4 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
