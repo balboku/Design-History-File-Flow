@@ -48,6 +48,7 @@ export interface AdvancePhaseActionInput {
   projectId: string
   forceOverride?: boolean
   overriddenById?: string
+  triggeredById?: string
   rationale?: string
 }
 
@@ -66,6 +67,7 @@ export async function advancePhaseAction(
     return await advancePhase(input.projectId, {
       forceOverride: input.forceOverride,
       overriddenById: input.overriddenById,
+      triggeredById: input.triggeredById,
       rationale: input.rationale,
     })
   } catch (err) {

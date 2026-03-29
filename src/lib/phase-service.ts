@@ -6,6 +6,7 @@ import {
   PendingItemStatus,
 } from '@prisma/client'
 
+import { recordAudit, AuditActions } from './audit-log-service'
 import { syncPendingItems } from './pending-item-service'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -133,7 +134,10 @@ export async function evaluatePhaseGate(
     throw new Error(`Project is already at the final phase: ${project.currentPhase}`)
   }
 
-  const isHardGate = target === ProjectPhase.DesignTransfer
+  // C-6: Both DesignTransfer and PostMarket entries are hard gates
+  const isHardGate =
+    target === ProjectPhase.DesignTransfer ||
+    target === ProjectPhase.PostMarket
 
   // Hard gate: check ALL required deliverables across all prior + current phases.
   // Soft gate: check only deliverables for the current phase.
@@ -153,7 +157,7 @@ export async function evaluatePhaseGate(
   })
 
   const deliverableIssues: PhaseGateIssue[] = deliverables
-    .filter((d) => d.status !== DeliverableStatus.Released)
+    .filter((d) => d.status !== DeliverableStatus.Released && d.status !== DeliverableStatus.Locked)
     .map((d) => ({
       deliverableId: d.id,
       deliverableCode: d.code,
@@ -162,7 +166,9 @@ export async function evaluatePhaseGate(
       reason:
         d.status === DeliverableStatus.Draft
           ? '文件尚在草稿狀態，未完成'
-          : '文件狀態非 Released，QA 尚未核准',
+          : d.status === DeliverableStatus.InReview
+            ? '文件尚在審查中，QA 尚未核准'
+            : '文件狀態非 Released，QA 尚未核准',
     }))
 
   const pendingItemIssues = isHardGate
@@ -252,6 +258,7 @@ async function lockTransferredDeliverables(
  * @param options.forceOverride   - PM accepts the risk and forces advancement (soft gates only).
  *                                  DesignTransfer can never be overridden.
  * @param options.overriddenById  - Required when forceOverride is true; records who triggered it.
+ * @param options.triggeredById   - Records who triggered a normal phase advance (for audit trail).
  * @param options.rationale       - Optional note on why the override was triggered.
  */
 export async function advancePhase(
@@ -259,30 +266,103 @@ export async function advancePhase(
   options?: {
     forceOverride?: boolean
     overriddenById?: string
+    triggeredById?: string
     rationale?: string
   },
 ): Promise<AdvancePhaseResult> {
-  const gate = await evaluatePhaseGate(projectId)
+  // ── C-1 修復：Gate 評估與推進在同一交易中完成 ──────────────────────────────────
+  // 先同步 pending items，再在交易中做所有檢查與寫入
+  await syncPendingItems(projectId)
 
-  // ── Gate passed ──────────────────────────────────────────────────────────────
-  if (gate.canAdvance) {
-    try {
-      const result = await prisma.$transaction(async (tx) => {
-        const current = await tx.project.findUnique({
-          where: { id: projectId },
-          select: { id: true, code: true, name: true, currentPhase: true },
-        })
-        if (!current) throw new Error(`Project not found: ${projectId}`)
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const current = await tx.project.findUnique({
+        where: { id: projectId },
+        select: { id: true, code: true, name: true, currentPhase: true },
+      })
+      if (!current) throw new Error(`Project not found: ${projectId}`)
 
-        const target = getNextPhase(current.currentPhase)
-        if (!target) throw new Error('Already at final phase')
+      const target = getNextPhase(current.currentPhase)
+      if (!target) throw new Error('Already at final phase')
+
+      // C-6: DesignTransfer 與 PostMarket 轉換都視為硬關卡
+      const isHardGate =
+        target === ProjectPhase.DesignTransfer ||
+        target === ProjectPhase.PostMarket
+
+      // 在交易內查詢 gate 狀態（原子性保證）
+      const whereClause = isHardGate
+        ? { projectId, isRequired: true }
+        : { projectId, phase: current.currentPhase, isRequired: true }
+
+      const deliverables = await tx.deliverablePlaceholder.findMany({
+        where: whereClause,
+        select: {
+          id: true,
+          code: true,
+          title: true,
+          status: true,
+          phase: true,
+        },
+      })
+
+      const deliverableIssues: PhaseGateIssue[] = deliverables
+        .filter((d) => d.status !== DeliverableStatus.Released && d.status !== DeliverableStatus.Locked)
+        .map((d) => ({
+          deliverableId: d.id,
+          deliverableCode: d.code,
+          deliverableTitle: d.title,
+          currentStatus: d.status,
+          reason:
+            d.status === DeliverableStatus.Draft
+              ? '文件尚在草稿狀態，未完成'
+              : d.status === DeliverableStatus.InReview
+                ? '文件尚在審查中，QA 尚未核准'
+                : '文件狀態非 Released，QA 尚未核准',
+        }))
+
+      const pendingItemIssues = isHardGate
+        ? await tx.pendingItem.findMany({
+            where: {
+              projectId,
+              status: PendingItemStatus.Open,
+            },
+            include: {
+              deliverable: {
+                select: {
+                  id: true,
+                  code: true,
+                  title: true,
+                  status: true,
+                },
+              },
+            },
+          })
+        : []
+
+      const openPendingIssues: PhaseGateIssue[] = pendingItemIssues.map((item) => ({
+        pendingItemId: item.id,
+        deliverableId: item.deliverable.id,
+        deliverableCode: item.deliverable.code,
+        deliverableTitle: item.deliverable.title,
+        currentStatus: item.deliverable.status,
+        reason: '前序階段條件式放行所留下的遺留項尚未補齊',
+      }))
+
+      const issues = isHardGate
+        ? dedupeIssuesByDeliverable([...deliverableIssues, ...openPendingIssues])
+        : deliverableIssues
+
+      // ── Gate passed ──────────────────────────────────────────────────────
+      if (issues.length === 0) {
+        const triggeredById = options?.triggeredById ?? null
 
         await tx.phaseTransition.create({
           data: {
             projectId,
             fromPhase: current.currentPhase,
             toPhase: target,
-            triggeredById: null,
+            triggeredById,
             wasOverride: false,
             overrideReason: null,
           },
@@ -298,78 +378,49 @@ export async function advancePhase(
           await lockTransferredDeliverables(tx, projectId)
         }
 
+        await recordAudit({
+          action: AuditActions.PHASE_ADVANCE,
+          entityType: 'Project',
+          entityId: projectId,
+          actorId: triggeredById,
+          detail: {
+            from: current.currentPhase,
+            to: target,
+            outcome: 'advanced',
+          },
+        }, tx)
+
         return {
+          kind: 'advanced' as const,
           previousPhase: current.currentPhase,
           project: updatedProject,
         }
-      })
-
-      return {
-        success: true,
-        outcome: 'advanced',
-        project: {
-          id: result.project.id,
-          code: result.project.code,
-          name: result.project.name,
-          previousPhase: result.previousPhase,
-          currentPhase: result.project.currentPhase,
-        },
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      if (msg.startsWith('Project not found') || msg === 'Already at final phase') throw err
-      throw new Error(`Phase advancement transaction failed: ${msg}`)
-    }
-  }
 
-  // ── Gate failed ─────────────────────────────────────────────────────────────
-  const { issues, isHardGate } = gate
+      // ── Gate failed: hard gate ──────────────────────────────────────────
+      if (isHardGate) {
+        return {
+          kind: 'hard_gate' as const,
+          target,
+          issues,
+        }
+      }
 
-  // DesignTransfer hard gate — no override permitted under any circumstances
-  if (isHardGate) {
-    return {
-      success: false,
-      reason: 'hard_gate',
-      message: `「${ProjectPhase.DesignTransfer}」為嚴格關卡，所有文件必須完成並核准後才能推進，不接受 Override。`,
-      issues,
-    }
-  }
+      // ── Gate failed: soft gate ─────────────────────────────────────────
+      if (!options?.forceOverride) {
+        return {
+          kind: 'warning' as const,
+          issues,
+        }
+      }
 
-  // Soft gate — return warning with issue list
-  if (!options?.forceOverride) {
-    const list = issues
-      .map((i) => `[${i.deliverableCode}] ${i.deliverableTitle}（${i.reason}）`)
-      .join('\n')
-    return {
-      success: true,
-      outcome: 'warning',
-      isHardGate: false,
-      message: `以下 ${issues.length} 項文件尚未 Released，請完成後再推進，或使用 forceOverride 參數強制推進：\n${list}`,
-      issues,
-    }
-  }
+      if (!options.overriddenById) {
+        return {
+          kind: 'validation_error' as const,
+        }
+      }
 
-  if (!options.overriddenById) {
-    return {
-      success: false,
-      reason: 'validation_error',
-      message: '條件式放行必須指定核准者，才能保留完整稽核紀錄。',
-    }
-  }
-
-  // forceOverride=true — PM accepts risk; advance and record audit
-  try {
-    const result = await prisma.$transaction(async (tx) => {
-      const current = await tx.project.findUnique({
-        where: { id: projectId },
-        select: { id: true, code: true, name: true, currentPhase: true },
-      })
-      if (!current) throw new Error(`Project not found: ${projectId}`)
-
-      const target = getNextPhase(current.currentPhase)
-      if (!target) throw new Error('Already at final phase')
-
-      // Persist override as an audit event
+      // ── Force override ─────────────────────────────────────────────────
       const transition = await tx.phaseTransition.create({
         data: {
           projectId,
@@ -413,27 +464,84 @@ export async function advancePhase(
         select: { id: true, code: true, name: true, currentPhase: true },
       })
 
-      if (target === ProjectPhase.DesignTransfer) {
-        await lockTransferredDeliverables(tx, projectId)
-      }
+      // Note: lockTransferredDeliverables is handled in the 'advanced' path only.
+      // In the 'forced' path, target can never be DesignTransfer because
+      // it would have been caught by the hard gate check above.
+
+      await recordAudit({
+        action: AuditActions.PHASE_OVERRIDE,
+        entityType: 'Project',
+        entityId: projectId,
+        actorId: options.overriddenById,
+        detail: {
+          from: current.currentPhase,
+          to: target,
+          outcome: 'forced',
+          rationale: options.rationale ?? null,
+          issueCount: issues.length,
+        },
+      }, tx)
 
       return {
+        kind: 'forced' as const,
         previousPhase: current.currentPhase,
         project: updatedProject,
+        issues,
       }
     })
 
-    return {
-      success: true,
-      outcome: 'forced',
-      project: {
-        id: result.project.id,
-        code: result.project.code,
-        name: result.project.name,
-        previousPhase: result.previousPhase,
-        currentPhase: result.project.currentPhase,
-      },
-      issues,
+    // ── Map transaction result to public API types ──────────────────────
+    switch (result.kind) {
+      case 'advanced':
+        return {
+          success: true,
+          outcome: 'advanced',
+          project: {
+            id: result.project.id,
+            code: result.project.code,
+            name: result.project.name,
+            previousPhase: result.previousPhase,
+            currentPhase: result.project.currentPhase,
+          },
+        }
+      case 'hard_gate':
+        return {
+          success: false,
+          reason: 'hard_gate',
+          message: `「${result.target}」為嚴格關卡，所有文件必須完成並核准後才能推進，不接受 Override。`,
+          issues: result.issues,
+        }
+      case 'warning': {
+        const list = result.issues
+          .map((i) => `[${i.deliverableCode}] ${i.deliverableTitle}（${i.reason}）`)
+          .join('\n')
+        return {
+          success: true,
+          outcome: 'warning',
+          isHardGate: false,
+          message: `以下 ${result.issues.length} 項文件尚未 Released，請完成後再推進，或使用 forceOverride 參數強制推進：\n${list}`,
+          issues: result.issues,
+        }
+      }
+      case 'validation_error':
+        return {
+          success: false,
+          reason: 'validation_error',
+          message: '條件式放行必須指定核准者，才能保留完整稽核紀錄。',
+        }
+      case 'forced':
+        return {
+          success: true,
+          outcome: 'forced',
+          project: {
+            id: result.project.id,
+            code: result.project.code,
+            name: result.project.name,
+            previousPhase: result.previousPhase,
+            currentPhase: result.project.currentPhase,
+          },
+          issues: result.issues,
+        }
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)

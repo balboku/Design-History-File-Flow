@@ -27,6 +27,7 @@ enum ProjectPhase {
 
 enum DeliverableStatus {
   Draft
+  InReview
   Released
   Locked
 }
@@ -68,6 +69,7 @@ model User {
   requestedChanges    ChangeRequest[]          @relation("ChangeRequester")
   approvedChanges     ChangeRequest[]          @relation("ChangeApprover")
   triggeredPhaseTransitions PhaseTransition[] @relation("PhaseTransitionTriggeredBy")
+  auditLogs           AuditLog[]               @relation("AuditActor")
 }
 
 model Project {
@@ -279,4 +281,20 @@ model ChangeRequest {
   @@index([projectId])
   @@index([requesterId])
   @@index([approverId])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  action      String
+  entityType  String
+  entityId    String
+  actorId     String?
+  detail      String?
+  createdAt   DateTime @default(now())
+  actor       User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@index([action])
 }

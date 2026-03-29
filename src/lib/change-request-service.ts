@@ -1,5 +1,6 @@
 import { ChangeRequestStatus } from '@prisma/client'
 
+import { recordAudit, AuditActions } from './audit-log-service'
 import { prisma } from './prisma'
 
 const CHANGE_REQUEST_WORKFLOW: Record<ChangeRequestStatus, ChangeRequestStatus[]> = {
@@ -28,7 +29,6 @@ export interface CreateChangeRequestInput {
   requesterId?: string | null
   deliverableIds?: string[]
   partComponentIds?: string[]
-  status?: ChangeRequestStatus
 }
 
 export interface CreateChangeRequestResult {
@@ -158,7 +158,7 @@ export async function createChangeRequest(
       description: input.description?.trim() || null,
       impactAnalysis,
       requesterId: input.requesterId ?? null,
-      status: input.status ?? ChangeRequestStatus.Draft,
+      status: ChangeRequestStatus.Draft,
       deliverableLinks: {
         create: deliverableIds.map((deliverableId) => ({
           deliverableId,
@@ -176,6 +176,18 @@ export async function createChangeRequest(
       title: true,
       status: true,
       projectId: true,
+    },
+  })
+  await recordAudit({
+    action: AuditActions.CHANGE_REQUEST_CREATE,
+    entityType: 'ChangeRequest',
+    entityId: changeRequest.id,
+    actorId: input.requesterId,
+    detail: {
+      code: changeRequest.code,
+      projectId: resolvedProjectId,
+      deliverableIds,
+      partComponentIds,
     },
   })
 
@@ -263,6 +275,18 @@ export async function transitionChangeRequest(
       submittedAt: true,
       approvedAt: true,
       implementedAt: true,
+    },
+  })
+
+  await recordAudit({
+    action: AuditActions.CHANGE_REQUEST_TRANSITION,
+    entityType: 'ChangeRequest',
+    entityId: updated.id,
+    actorId: actedById,
+    detail: {
+      code: updated.code,
+      from: changeRequest.status,
+      to: updated.status,
     },
   })
 

@@ -16,7 +16,6 @@ export interface CreateChangeRequestActionInput {
   requesterId?: string | null
   deliverableIds?: string[]
   partComponentIds?: string[]
-  status?: ChangeRequestStatus
 }
 
 export type CreateChangeRequestActionResult = {

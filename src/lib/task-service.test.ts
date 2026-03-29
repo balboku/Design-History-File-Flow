@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest'
 import { execSync } from 'child_process'
 import { prisma } from './prisma'
-import { createTask, completeTask, TASK_COMPLETION_ERROR } from './task-service'
+import { createTask, startTask, completeTask, TASK_COMPLETION_ERROR, TASK_NOT_IN_PROGRESS_ERROR, TASK_START_ERROR } from './task-service'
 import { advancePhase, evaluatePhaseGate } from './phase-service'
 import {
   listProjectPendingItems,
@@ -17,6 +17,7 @@ import {
 import {
   LOCKED_DELIVERABLE_APPROVED_CHANGE_REQUEST_ERROR,
   LOCKED_DELIVERABLE_STATUS_CHANGE_ERROR,
+  INVALID_STATUS_TRANSITION_ERROR,
   createFileRevision,
   updateDeliverableStatus,
 } from './deliverable-service'
@@ -58,12 +59,16 @@ beforeAll(async () => {
 
 afterEach(async () => {
   // Clean up data between tests to avoid unique constraint conflicts
+  await prisma.auditLog.deleteMany()
   await prisma.taskDeliverable.deleteMany()
   await prisma.task.deleteMany()
   await prisma.fileRevision.deleteMany()
   await prisma.pendingItem.deleteMany()
   await prisma.deliverablePlaceholder.deleteMany()
   await prisma.phaseTransition.deleteMany()
+  await prisma.changeRequestDeliverable.deleteMany()
+  await prisma.changeRequestPart.deleteMany()
+  await prisma.changeRequest.deleteMany()
   await prisma.project.deleteMany()
 })
 
@@ -220,9 +225,69 @@ describe('completeTask', () => {
       )
     )
 
+    await startTask(result.task.id)
     const completed = await completeTask(result.task.id)
     expect(completed.task.status).toBe(TaskStatus.Done)
     expect(completed.task.completedAt).toBeInstanceOf(Date)
+  })
+
+  it('待開始狀態的 Task 無法直接完成（必須先啟動）', async () => {
+    const project = await setupProject()
+    const deliverables = await setupDeliverables(project.id, 1)
+
+    await prisma.fileRevision.create({
+      data: {
+        deliverableId: deliverables[0].id,
+        revisionNumber: 1,
+        fileName: 'doc.pdf',
+        storagePath: `/files/${deliverables[0].id}/doc.pdf`,
+        mimeType: 'application/pdf',
+        fileSizeBytes: 1024,
+      },
+    })
+
+    const result = await createTask({
+      projectId: project.id,
+      code: `T-${uid()}`,
+      title: 'Task not started',
+      plannedPhase: ProjectPhase.DesignOutput,
+      deliverableIds: deliverables.map((d) => d.id),
+    })
+
+    await expect(completeTask(result.task.id)).rejects.toThrow(TASK_NOT_IN_PROGRESS_ERROR)
+  })
+
+  it('startTask 可以將 Todo 狀態轉為 InProgress', async () => {
+    const project = await setupProject()
+    const deliverables = await setupDeliverables(project.id, 1)
+
+    const result = await createTask({
+      projectId: project.id,
+      code: `T-${uid()}`,
+      title: 'Task to start',
+      plannedPhase: ProjectPhase.Planning,
+      deliverableIds: deliverables.map((d) => d.id),
+    })
+
+    const started = await startTask(result.task.id)
+    expect(started.task.status).toBe(TaskStatus.InProgress)
+    expect(started.task.startedAt).toBeInstanceOf(Date)
+  })
+
+  it('已啟動的 Task 不能再次啟動', async () => {
+    const project = await setupProject()
+    const deliverables = await setupDeliverables(project.id, 1)
+
+    const result = await createTask({
+      projectId: project.id,
+      code: `T-${uid()}`,
+      title: 'Already started',
+      plannedPhase: ProjectPhase.Planning,
+      deliverableIds: deliverables.map((d) => d.id),
+    })
+
+    await startTask(result.task.id)
+    await expect(startTask(result.task.id)).rejects.toThrow(TASK_START_ERROR)
   })
 
   it('有 DeliverablePlaceholder 尚未上傳 FileRevision 時，阻擋完成並顯示正確錯誤訊息', async () => {
@@ -248,7 +313,7 @@ describe('completeTask', () => {
       deliverableIds: [delivered.id, notDelivered.id],
     })
 
-    await expect(completeTask(result.task.id)).rejects.toThrow(TASK_COMPLETION_ERROR)
+    await expect(completeTask(result.task.id)).rejects.toThrow(TASK_NOT_IN_PROGRESS_ERROR)
   })
 
   it('Task 已為 Done 狀態時，再次呼叫 completeTask 拋出錯誤', async () => {
@@ -274,6 +339,7 @@ describe('completeTask', () => {
       deliverableIds: deliverables.map((d) => d.id),
     })
 
+    await startTask(result.task.id)
     await completeTask(result.task.id)
     await expect(completeTask(result.task.id)).rejects.toThrow('Task is already completed.')
   })
@@ -290,7 +356,7 @@ describe('completeTask', () => {
       deliverableIds: deliverables.map((d) => d.id),
     })
 
-    await expect(completeTask(result.task.id)).rejects.toThrow(TASK_COMPLETION_ERROR)
+    await expect(completeTask(result.task.id)).rejects.toThrow(TASK_NOT_IN_PROGRESS_ERROR)
   })
 })
 

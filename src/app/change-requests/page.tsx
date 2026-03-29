@@ -58,7 +58,6 @@ export default async function ChangeRequestsPage({
       impactAnalysis: String(formData.get('impactAnalysis') ?? '') || undefined,
       projectId: String(formData.get('projectId') ?? '') || undefined,
       requesterId: String(formData.get('requesterId') ?? '') || undefined,
-      status: String(formData.get('status') ?? ChangeRequestStatus.Draft) as ChangeRequestStatus,
       deliverableIds: formData.getAll('deliverableIds').map(String),
       partComponentIds: formData.getAll('partComponentIds').map(String),
     })
@@ -184,13 +183,6 @@ export default async function ChangeRequestsPage({
                 </option>
               ))}
             </select>
-            <select name="status" defaultValue={ChangeRequestStatus.Draft} style={darkInputStyle}>
-              {Object.values(ChangeRequestStatus).map((status) => (
-                <option key={status} value={status}>
-                  {formatChangeRequestStatus(status)}
-                </option>
-              ))}
-            </select>
             <select
               name="deliverableIds"
               multiple
@@ -253,7 +245,13 @@ export default async function ChangeRequestsPage({
             {changeRequests.map((changeRequest) => (
               <div
                 key={changeRequest.id}
-                className="rounded-[22px] border border-[rgba(73,52,27,0.12)] bg-[rgba(255,248,239,0.72)] p-[18px] shadow-[0_12px_28px_rgba(57,37,16,0.06)]"
+                style={{
+                  borderRadius: 22,
+                  border: '1px solid rgba(73, 52, 27, 0.12)',
+                  background: 'rgba(255, 248, 239, 0.72)',
+                  padding: 18,
+                  boxShadow: '0 12px 28px rgba(57, 37, 16, 0.06)',
+                }}
               >
                 <div
                   style={{
@@ -318,7 +316,15 @@ export default async function ChangeRequestsPage({
                 {getAllowedChangeRequestTransitions(changeRequest.status).length > 0 ? (
                   <form
                     action={transitionChangeRequestForm}
-                    className="mt-4 grid gap-3 rounded-[18px] border border-[rgba(73,52,27,0.1)] bg-[rgba(255,255,255,0.48)] p-4"
+                    style={{
+                      marginTop: 16,
+                      display: 'grid',
+                      gap: 12,
+                      borderRadius: 18,
+                      border: '1px solid rgba(73, 52, 27, 0.1)',
+                      background: 'rgba(255, 255, 255, 0.48)',
+                      padding: 16,
+                    }}
                   >
                     <input type="hidden" name="changeRequestId" value={changeRequest.id} />
                     {getAllowedChangeRequestTransitions(changeRequest.status).some(
@@ -335,14 +341,22 @@ export default async function ChangeRequestsPage({
                         ))}
                       </select>
                     ) : null}
-                    <div className="flex flex-wrap gap-2">
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                       {getAllowedChangeRequestTransitions(changeRequest.status).map((status) => (
                         <button
                           key={status}
                           type="submit"
                           name="nextStatus"
                           value={status}
-                          className="rounded-full border border-[var(--app-border)] bg-white/80 px-4 py-2 font-bold text-[var(--app-primary-strong)] transition hover:-translate-y-0.5 hover:bg-white"
+                          style={{
+                            borderRadius: 9999,
+                            border: '1px solid var(--app-border)',
+                            background: 'rgba(255, 255, 255, 0.8)',
+                            padding: '8px 16px',
+                            fontWeight: 700,
+                            color: 'var(--app-primary-strong)',
+                            cursor: 'pointer',
+                          }}
                         >
                           轉為{formatChangeRequestStatus(status)}
                         </button>

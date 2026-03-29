@@ -1,5 +1,6 @@
 import { prisma } from './prisma'
 import { TaskStatus, ProjectPhase } from '@prisma/client'
+import { recordAudit, AuditActions } from './audit-log-service'
 
 export interface CreateTaskInput {
   projectId: string
@@ -28,6 +29,14 @@ export interface CompleteTaskResult {
     id: string
     status: TaskStatus
     completedAt: Date
+  }
+}
+
+export interface StartTaskResult {
+  task: {
+    id: string
+    status: TaskStatus
+    startedAt: Date
   }
 }
 
@@ -78,6 +87,19 @@ export async function createTask(input: CreateTaskInput): Promise<CreateTaskResu
     },
   })
 
+  await recordAudit({
+    action: AuditActions.TASK_CREATE,
+    entityType: 'Task',
+    entityId: task.id,
+    actorId: input.createdById,
+    detail: {
+      code: task.code,
+      projectId: input.projectId,
+      plannedPhase: task.plannedPhase,
+      deliverableIds: input.deliverableIds,
+    },
+  })
+
   return {
     task: {
       id: task.id,
@@ -90,7 +112,55 @@ export async function createTask(input: CreateTaskInput): Promise<CreateTaskResu
   }
 }
 
+export const TASK_START_ERROR = '只有待開始的任務才能啟動'
+
+/**
+ * 將 Task 狀態從 Todo 更新為 InProgress。
+ */
+export async function startTask(taskId: string): Promise<StartTaskResult> {
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { id: true, status: true },
+  })
+
+  if (!task) {
+    throw new Error(`Task not found: ${taskId}`)
+  }
+
+  if (task.status !== TaskStatus.Todo) {
+    throw new Error(TASK_START_ERROR)
+  }
+
+  const updated = await prisma.task.update({
+    where: { id: taskId },
+    data: {
+      status: TaskStatus.InProgress,
+      startedAt: new Date(),
+    },
+    select: { id: true, status: true, startedAt: true },
+  })
+
+  if (!updated.startedAt) {
+    throw new Error('Task start timestamp was not persisted.')
+  }
+
+  await recordAudit({
+    action: AuditActions.TASK_START,
+    entityType: 'Task',
+    entityId: updated.id,
+  })
+
+  return {
+    task: {
+      id: updated.id,
+      status: updated.status,
+      startedAt: updated.startedAt,
+    },
+  }
+}
+
 export const TASK_COMPLETION_ERROR = '綁定的產出文件尚未上傳，無法完成任務'
+export const TASK_NOT_IN_PROGRESS_ERROR = '任務必須在進行中狀態才能標記完成'
 
 /**
  * 將 Task 狀態更新為 Done。
@@ -124,6 +194,10 @@ export async function completeTask(taskId: string): Promise<CompleteTaskResult> 
     throw new Error('Task is already completed.')
   }
 
+  if (task.status !== TaskStatus.InProgress) {
+    throw new Error(TASK_NOT_IN_PROGRESS_ERROR)
+  }
+
   const missingRevisions = task.deliverableLinks.filter(
     (link) => link.deliverable.fileRevisions.length === 0,
   )
@@ -145,6 +219,12 @@ export async function completeTask(taskId: string): Promise<CompleteTaskResult> 
   if (!updated.completedAt) {
     throw new Error('Task completion timestamp was not persisted.')
   }
+
+  await recordAudit({
+    action: AuditActions.TASK_COMPLETE,
+    entityType: 'Task',
+    entityId: updated.id,
+  })
 
   return {
     task: {

@@ -27,6 +27,7 @@ export const projectPhaseLabels: Record<ProjectPhase, string> = {
 
 export const deliverableStatusLabels: Record<DeliverableStatus, string> = {
   Draft: '草稿',
+  InReview: '審查中',
   Released: '已發行',
   Locked: '已上鎖',
 }

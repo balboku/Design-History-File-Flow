@@ -1,5 +1,6 @@
 import { PendingItemStatus, DeliverableStatus } from '@prisma/client'
 
+import { recordAudit, AuditActions } from './audit-log-service'
 import { prisma } from './prisma'
 
 export const PENDING_ITEM_RESOLUTION_ERROR = '綁定文件尚未 Released，無法結案遺留項'
@@ -152,7 +153,7 @@ export async function resolvePendingItem(
     throw new Error(PENDING_ITEM_RESOLUTION_ERROR)
   }
 
-  return prisma.pendingItem.update({
+  const resolved = await prisma.pendingItem.update({
     where: { id: pendingItemId },
     data: {
       status: PendingItemStatus.Resolved,
@@ -179,4 +180,16 @@ export async function resolvePendingItem(
       },
     },
   })
+
+  await recordAudit({
+    action: AuditActions.PENDING_ITEM_RESOLVE,
+    entityType: 'PendingItem',
+    entityId: resolved.id,
+    detail: {
+      title: resolved.title,
+      deliverableId: resolved.deliverableId,
+    },
+  })
+
+  return resolved
 }

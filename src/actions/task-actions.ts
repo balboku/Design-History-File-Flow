@@ -1,6 +1,6 @@
 'use server'
 
-import { createTask, completeTask, TASK_COMPLETION_ERROR } from '@/lib/task-service'
+import { createTask, startTask, completeTask, TASK_COMPLETION_ERROR, TASK_NOT_IN_PROGRESS_ERROR } from '@/lib/task-service'
 import { ProjectPhase } from '@prisma/client'
 
 // ─── Create Task ──────────────────────────────────────────────────────────────
@@ -36,6 +36,28 @@ export async function createTaskAction(
   }
 }
 
+// ─── Start Task ───────────────────────────────────────────────────────────────
+
+export type StartTaskActionResult = {
+  success: true
+  data: Awaited<ReturnType<typeof startTask>>['task']
+} | {
+  success: false
+  error: string
+}
+
+export async function startTaskAction(
+  taskId: string
+): Promise<StartTaskActionResult> {
+  try {
+    const result = await startTask(taskId)
+    return { success: true, data: result.task }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return { success: false, error: message }
+  }
+}
+
 // ─── Complete Task ────────────────────────────────────────────────────────────
 
 export type CompleteTaskActionResult = {
@@ -45,6 +67,7 @@ export type CompleteTaskActionResult = {
   success: false
   error: string
   isFileMissingError?: boolean
+  isNotInProgressError?: boolean
 }
 
 export async function completeTaskAction(
@@ -56,6 +79,7 @@ export async function completeTaskAction(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     const isFileMissingError = message.startsWith(TASK_COMPLETION_ERROR)
-    return { success: false, error: message, isFileMissingError }
+    const isNotInProgressError = message === TASK_NOT_IN_PROGRESS_ERROR
+    return { success: false, error: message, isFileMissingError, isNotInProgressError }
   }
 }

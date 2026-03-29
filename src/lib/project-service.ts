@@ -1,5 +1,6 @@
 import { ProjectPhase } from '@prisma/client'
 
+import { recordAudit, AuditActions } from './audit-log-service'
 import { prisma } from './prisma'
 
 export interface CreateProjectInput {
@@ -57,6 +58,17 @@ export async function createProject(
       code: true,
       name: true,
       currentPhase: true,
+    },
+  })
+  await recordAudit({
+    action: AuditActions.PROJECT_CREATE,
+    entityType: 'Project',
+    entityId: project.id,
+    actorId: input.ownerId,
+    detail: {
+      code: project.code,
+      name: project.name,
+      currentPhase: project.currentPhase,
     },
   })
 

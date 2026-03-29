@@ -7,6 +7,7 @@ import {
 } from '@/actions/phase-actions'
 import {
   createTaskAction,
+  startTaskAction,
   completeTaskAction,
 } from '@/actions/task-actions'
 import {
@@ -113,6 +114,19 @@ export default async function ProjectDetailPage({
     redirect(buildUrl(projectId, { error: result.error }))
   }
 
+  async function startTaskForm(formData: FormData) {
+    'use server'
+
+    const taskId = String(formData.get('taskId') ?? '')
+    const result = await startTaskAction(taskId)
+
+    if (result.success) {
+      redirect(buildUrl(projectId, { notice: `任務已開始執行` }))
+    }
+
+    redirect(buildUrl(projectId, { error: result.error }))
+  }
+
   async function completeTaskForm(formData: FormData) {
     'use server'
 
@@ -130,9 +144,11 @@ export default async function ProjectDetailPage({
     'use server'
 
     const forceOverride = formData.get('forceOverride') === 'true'
+    const triggeredById = String(formData.get('triggeredById') ?? '') || undefined
     const result = await advancePhaseAction({
       projectId,
       forceOverride,
+      triggeredById: forceOverride ? undefined : triggeredById,
       overriddenById: forceOverride
         ? String(formData.get('overriddenById') ?? '') || undefined
         : undefined,
@@ -188,6 +204,9 @@ export default async function ProjectDetailPage({
   }
 
   const doneTasks = project.tasks.filter((task) => task.status === 'Done').length
+  const atRiskTasks = project.tasks.filter(
+    (task) => task.plannedPhase !== project.currentPhase && task.status !== 'Done',
+  ).length
   const releasedDeliverables = project.deliverables.filter(
     (deliverable) => deliverable.status === 'Released',
   ).length
@@ -227,7 +246,7 @@ export default async function ProjectDetailPage({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+          gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
           gap: 16,
           marginBottom: 22,
         }}
@@ -237,6 +256,12 @@ export default async function ProjectDetailPage({
           label="已完成任務"
           value={`${doneTasks}/${project.tasks.length}`}
           accent="var(--app-accent)"
+        />
+        <MetricCard
+          label="At-Risk 任務"
+          value={String(atRiskTasks)}
+          hint="超前或落後專案當前階段的進行中任務"
+          accent={atRiskTasks > 0 ? 'var(--app-danger)' : 'var(--app-success)'}
         />
         <MetricCard
           label="已釋出文件"
@@ -267,7 +292,17 @@ export default async function ProjectDetailPage({
               <div style={{ marginBottom: 14 }}>
                 <StatusPill label={`下一階段：${formatProjectPhase(gate.nextPhase)}`} tone="good" />
               </div>
-              <form action={advanceProject}>
+              <form action={advanceProject} style={{ display: 'grid', gap: 10 }}>
+                <select name="triggeredById" defaultValue="" style={inputStyle}>
+                  <option value="">選擇推進操作者</option>
+                  {lookup.users
+                    .filter((user) => user.role === Role.PM || user.role === Role.ADMIN)
+                    .map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name} · {formatRole(user.role)}
+                      </option>
+                    ))}
+                </select>
                 <button type="submit" style={buttonStyle}>
                   推進階段
                 </button>
@@ -448,7 +483,14 @@ export default async function ProjectDetailPage({
                   <div style={{ marginTop: 8, color: '#5b452c' }}>
                     指派給：{task.assignee?.name ?? '未指派'}
                   </div>
-                  {task.status !== 'Done' ? (
+                  {task.status === 'Todo' ? (
+                    <form action={startTaskForm} style={{ marginTop: 12 }}>
+                      <input type="hidden" name="taskId" value={task.id} />
+                      <button type="submit" style={buttonStyle}>
+                        開始執行
+                      </button>
+                    </form>
+                  ) : task.status === 'InProgress' ? (
                     <form action={completeTaskForm} style={{ marginTop: 12 }}>
                       <input type="hidden" name="taskId" value={task.id} />
                       <button type="submit" style={buttonStyle}>
@@ -546,7 +588,9 @@ export default async function ProjectDetailPage({
                           ? 'good'
                           : deliverable.status === 'Locked'
                             ? 'critical'
-                            : 'warn'
+                            : deliverable.status === 'InReview'
+                              ? 'neutral'
+                              : 'warn'
                       }
                     />
                     <StatusPill label={formatProjectPhase(deliverable.phase)} tone="neutral" />
@@ -670,30 +714,43 @@ export default async function ProjectDetailPage({
                   <form action={updateDeliverableStatusForm} style={{ display: 'grid', gap: 10 }}>
                     <input type="hidden" name="deliverableId" value={deliverable.id} />
                     <div style={fieldLabelStyle}>QA 狀態控制</div>
-                    <button
-                      type="submit"
-                      name="status"
-                      value={DeliverableStatus.Draft}
-                      style={secondaryButtonStyle}
-                    >
-                      設為草稿
-                    </button>
-                    <button
-                      type="submit"
-                      name="status"
-                      value={DeliverableStatus.Released}
-                      style={buttonStyle}
-                    >
-                      設為已釋出
-                    </button>
-                    <button
-                      type="submit"
-                      name="status"
-                      value={DeliverableStatus.Locked}
-                      style={criticalButtonStyle}
-                    >
-                      鎖定文件
-                    </button>
+                    {deliverable.status === DeliverableStatus.Draft ? (
+                      <button
+                        type="submit"
+                        name="status"
+                        value={DeliverableStatus.InReview}
+                        style={buttonStyle}
+                      >
+                        送出審查
+                      </button>
+                    ) : deliverable.status === DeliverableStatus.InReview ? (
+                      <>
+                        <button
+                          type="submit"
+                          name="status"
+                          value={DeliverableStatus.Released}
+                          style={buttonStyle}
+                        >
+                          核准釋出
+                        </button>
+                        <button
+                          type="submit"
+                          name="status"
+                          value={DeliverableStatus.Draft}
+                          style={secondaryButtonStyle}
+                        >
+                          退回草稿
+                        </button>
+                      </>
+                    ) : deliverable.status === DeliverableStatus.Released ? (
+                      <div style={{ color: '#6c573f', lineHeight: 1.5 }}>
+                        文件已釋出，狀態不可手動變更。如需修改，請透過變更單流程建立新版次。
+                      </div>
+                    ) : (
+                      <div style={{ color: '#6c573f', lineHeight: 1.5 }}>
+                        文件已鎖定。如需修改，需建立變更單並經核准後上傳新版次。
+                      </div>
+                    )}
                   </form>
                 </div>
               </div>

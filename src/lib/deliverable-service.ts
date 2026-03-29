@@ -1,8 +1,6 @@
-import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
-import path from 'node:path'
-
 import { ChangeRequestStatus, DeliverableStatus, ProjectPhase } from '@prisma/client'
 
+import { recordAudit, AuditActions } from './audit-log-service'
 import { syncPendingItems } from './pending-item-service'
 import { prisma } from './prisma'
 
@@ -14,6 +12,20 @@ export const LOCKED_DELIVERABLE_STATUS_CHANGE_ERROR =
   'Locked deliverables cannot be directly unlocked. Create a Change Request and upload a new revision instead.'
 export const LOCKED_DELIVERABLE_APPROVED_CHANGE_REQUEST_ERROR =
   'Locked deliverables require an approved Change Request before a new revision can be uploaded.'
+export const INVALID_STATUS_TRANSITION_ERROR =
+  'Invalid deliverable status transition.'
+
+/**
+ * 合法的狀態轉換路徑。Draft → InReview → Released 為主線。
+ * Locked 只能由系統（設計移轉）設定，不能手動跳轉。
+ * Released → Draft 是被禁止的——需透過 CR 流程。
+ */
+const DELIVERABLE_STATUS_TRANSITIONS: Record<DeliverableStatus, DeliverableStatus[]> = {
+  Draft: [DeliverableStatus.InReview],
+  InReview: [DeliverableStatus.Draft, DeliverableStatus.Released],
+  Released: [], // Released 不能再手動變更
+  Locked: [],   // Locked 不能手動解鎖
+}
 
 const APPROVED_CHANGE_REQUEST_STATUSES: ChangeRequestStatus[] = [
   ChangeRequestStatus.Approved,
@@ -21,6 +33,8 @@ const APPROVED_CHANGE_REQUEST_STATUSES: ChangeRequestStatus[] = [
   ChangeRequestStatus.Implemented,
   ChangeRequestStatus.Closed,
 ]
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
+import path from 'node:path'
 
 const REVISION_STORAGE_ROOT = path.join(process.cwd(), 'storage', 'revisions')
 
@@ -137,6 +151,18 @@ export async function createDeliverable(
       title: true,
       status: true,
       phase: true,
+    },
+  })
+
+  await recordAudit({
+    action: AuditActions.DELIVERABLE_CREATE,
+    entityType: 'DeliverablePlaceholder',
+    entityId: deliverable.id,
+    actorId: input.ownerId,
+    detail: {
+      code: deliverable.code,
+      phase: deliverable.phase,
+      projectId: input.projectId,
     },
   })
 
@@ -273,6 +299,18 @@ export async function createFileRevision(
       createdAt: true,
     },
   })
+  await recordAudit({
+    action: AuditActions.FILE_REVISION_UPLOAD,
+    entityType: 'FileRevision',
+    entityId: revision.id,
+    actorId: input.uploadedById,
+    detail: {
+      deliverableId: input.deliverableId,
+      revisionNumber: revision.revisionNumber,
+      fileName: revision.fileName,
+      changeRequestId: input.changeRequestId ?? null,
+    },
+  })
 
   await syncPendingItems(deliverable.projectId)
 
@@ -364,6 +402,7 @@ export async function updateDeliverableStatus(
     select: {
       id: true,
       projectId: true,
+      code: true,
       status: true,
     },
   })
@@ -372,15 +411,24 @@ export async function updateDeliverableStatus(
     throw new Error(`Deliverable not found: ${input.deliverableId}`)
   }
 
+  // Locked → anything is blocked (use CR flow)
   if (existing.status === DeliverableStatus.Locked && input.status !== DeliverableStatus.Locked) {
     throw new Error(LOCKED_DELIVERABLE_STATUS_CHANGE_ERROR)
+  }
+
+  // Enforce valid transitions
+  const allowedTargets = DELIVERABLE_STATUS_TRANSITIONS[existing.status]
+  if (!allowedTargets.includes(input.status) && input.status !== existing.status) {
+    throw new Error(
+      `${INVALID_STATUS_TRANSITION_ERROR} (${existing.status} → ${input.status})`,
+    )
   }
 
   const deliverable = await prisma.deliverablePlaceholder.update({
     where: { id: input.deliverableId },
     data: {
       status: input.status,
-      lockedAt: input.status === DeliverableStatus.Locked ? new Date() : null,
+      lockedAt: input.status === DeliverableStatus.Locked ? new Date() : undefined,
     },
     select: {
       id: true,
@@ -388,6 +436,17 @@ export async function updateDeliverableStatus(
       code: true,
       status: true,
       lockedAt: true,
+    },
+  })
+
+  await recordAudit({
+    action: AuditActions.DELIVERABLE_STATUS_CHANGE,
+    entityType: 'DeliverablePlaceholder',
+    entityId: deliverable.id,
+    detail: {
+      code: deliverable.code,
+      from: existing.status,
+      to: deliverable.status,
     },
   })
 
