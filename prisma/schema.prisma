@@ -1,0 +1,212 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  PM
+  RD
+  QA
+  ADMIN
+}
+
+enum ProjectPhase {
+  Concept
+  Planning
+  DesignInput
+  DesignOutput
+  Verification
+  Validation
+  DesignTransfer
+  PostMarket
+}
+
+enum DeliverableStatus {
+  Draft
+  Released
+  Locked
+}
+
+enum TaskStatus {
+  Todo
+  InProgress
+  Done
+}
+
+enum ChangeRequestStatus {
+  Draft
+  Submitted
+  InReview
+  Approved
+  Rejected
+  Implemented
+  Closed
+}
+
+model User {
+  id                  String                   @id @default(cuid())
+  email               String                   @unique
+  name                String
+  role                Role
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  assignedTasks       Task[]                   @relation("TaskAssignee")
+  createdTasks        Task[]                   @relation("TaskCreator")
+  ownedProjects       Project[]                @relation("ProjectOwner")
+  qaOwnedDeliverables DeliverablePlaceholder[] @relation("DeliverableOwner")
+  uploadedRevisions   FileRevision[]           @relation("RevisionUploader")
+  requestedChanges    ChangeRequest[]          @relation("ChangeRequester")
+  approvedChanges     ChangeRequest[]          @relation("ChangeApprover")
+}
+
+model Project {
+  id             String                   @id @default(cuid())
+  code           String                   @unique
+  name           String
+  description    String?
+  currentPhase   ProjectPhase             @default(Concept)
+  ownerId        String?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  owner          User?                    @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  tasks          Task[]
+  deliverables   DeliverablePlaceholder[]
+  changeRequests ChangeRequest[]
+
+  @@index([currentPhase])
+  @@index([ownerId])
+}
+
+model DeliverablePlaceholder {
+  id             String            @id @default(cuid())
+  projectId      String
+  ownerId        String?
+  code           String
+  title          String
+  description    String?
+  phase          ProjectPhase
+  isRequired     Boolean           @default(true)
+  status         DeliverableStatus @default(Draft)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  lockedAt       DateTime?
+  project        Project           @relation(fields: [projectId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  owner          User?             @relation("DeliverableOwner", fields: [ownerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  taskLinks      TaskDeliverable[]
+  fileRevisions  FileRevision[]
+  changeRequests ChangeRequest[]
+
+  @@unique([projectId, code])
+  @@index([projectId, phase, status])
+  @@index([ownerId])
+}
+
+/// Application invariant: every Task must have at least one TaskDeliverable row.
+model Task {
+  id               String            @id @default(cuid())
+  projectId        String
+  assigneeId       String?
+  createdById      String?
+  code             String
+  title            String
+  description      String?
+  plannedPhase     ProjectPhase
+  status           TaskStatus        @default(Todo)
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  project          Project           @relation(fields: [projectId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  assignee         User?             @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  createdBy        User?             @relation("TaskCreator", fields: [createdById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  deliverableLinks TaskDeliverable[]
+
+  @@unique([projectId, code])
+  @@index([projectId, plannedPhase, status])
+  @@index([assigneeId])
+  @@index([createdById])
+}
+
+model TaskDeliverable {
+  id            String                 @id @default(cuid())
+  taskId        String
+  deliverableId String
+  createdAt     DateTime               @default(now())
+  task          Task                   @relation(fields: [taskId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  deliverable   DeliverablePlaceholder @relation(fields: [deliverableId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([taskId, deliverableId])
+  @@index([deliverableId])
+}
+
+model FileRevision {
+  id              String                 @id @default(cuid())
+  deliverableId   String
+  changeRequestId String?
+  uploadedById    String?
+  revisionNumber  Int
+  fileName        String
+  storagePath     String
+  mimeType        String?
+  fileSizeBytes   Int?
+  changeSummary   String?
+  createdAt       DateTime               @default(now())
+  deliverable     DeliverablePlaceholder @relation(fields: [deliverableId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  changeRequest   ChangeRequest?         @relation(fields: [changeRequestId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  uploadedBy      User?                  @relation("RevisionUploader", fields: [uploadedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@unique([deliverableId, revisionNumber])
+  @@index([changeRequestId])
+  @@index([uploadedById])
+  @@index([createdAt])
+}
+
+model PartComponent {
+  id             String          @id @default(cuid())
+  partNumber     String          @unique
+  name           String
+  description    String?
+  manufacturer   String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  changeRequests ChangeRequest[]
+
+  @@index([name])
+}
+
+/// Application invariant: at least one of projectId, deliverableId, or partComponentId must be set.
+model ChangeRequest {
+  id              String                  @id @default(cuid())
+  code            String                  @unique
+  title           String
+  description     String?
+  status          ChangeRequestStatus     @default(Draft)
+  impactAnalysis  String?
+  requesterId     String?
+  approverId      String?
+  projectId       String?
+  deliverableId   String?
+  partComponentId String?
+  submittedAt     DateTime?
+  approvedAt      DateTime?
+  implementedAt   DateTime?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  requester       User?                   @relation("ChangeRequester", fields: [requesterId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  approver        User?                   @relation("ChangeApprover", fields: [approverId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  project         Project?                @relation(fields: [projectId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  deliverable     DeliverablePlaceholder? @relation(fields: [deliverableId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  partComponent   PartComponent?          @relation(fields: [partComponentId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  fileRevisions   FileRevision[]
+
+  @@index([status])
+  @@index([requesterId])
+  @@index([approverId])
+  @@index([projectId])
+  @@index([deliverableId])
+  @@index([partComponentId])
+}
