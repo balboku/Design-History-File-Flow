@@ -46,6 +46,7 @@ export default async function ProjectsPage({
       description: String(formData.get('description') ?? '') || undefined,
       currentPhase: String(formData.get('currentPhase') ?? ProjectPhase.Concept) as ProjectPhase,
       ownerId: String(formData.get('ownerId') ?? '') || undefined,
+      targetEndDate: String(formData.get('targetEndDate') ?? '') || null,
     })
 
     if (result.success) {
@@ -220,6 +221,12 @@ export default async function ProjectsPage({
                 </option>
               ))}
             </select>
+            <label style={{ fontSize: 13, color: 'rgba(255,244,228,0.7)', marginBottom: -4 }}>預計完成日 (targetEndDate)</label>
+            <input
+              type="date"
+              name="targetEndDate"
+              style={darkInputStyle}
+            />
             <button type="submit" style={lightButtonStyle}>
               建立專案
             </button>

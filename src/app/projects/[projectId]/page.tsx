@@ -23,16 +23,19 @@ import {
   SectionCard,
   StatusPill,
 } from '@/components/app-shell'
+import { ProjectGantt } from '@/components/project-gantt'
 import { getProjectDetail, getWorkspaceLookupData } from '@/lib/frontend-data'
 import {
   formatAdvanceOutcome,
   formatChangeRequestStatus,
   formatDateTimeZh,
+  formatDateShort,
   formatDeliverableStatus,
   formatPendingItemStatus,
   formatProjectPhase,
   formatRole,
   formatTaskStatus,
+  isOverdue,
 } from '@/lib/ui-labels'
 
 type Params = Promise<{ projectId: string }>
@@ -104,6 +107,8 @@ export default async function ProjectDetailPage({
       createdById: String(formData.get('createdById') ?? '') || undefined,
       plannedPhase: String(formData.get('plannedPhase') ?? ProjectPhase.Planning) as ProjectPhase,
       deliverableIds: formData.getAll('deliverableIds').map(String),
+      plannedStartDate: String(formData.get('plannedStartDate') ?? '') || null,
+      targetDate: String(formData.get('targetDate') ?? '') || null,
     })
 
     if (result.success) {
@@ -175,6 +180,7 @@ export default async function ProjectDetailPage({
       ownerId: String(formData.get('ownerId') ?? '') || undefined,
       isRequired: formData.get('isRequired') === 'true',
       actorId: String(formData.get('actorId') ?? ''),
+      targetDate: String(formData.get('targetDate') ?? '') || null,
     })
 
     if (result.success) {
@@ -355,22 +361,25 @@ export default async function ProjectDetailPage({
                     style={{ ...inputStyle, minHeight: 110, resize: 'vertical' }}
                   />
                   <button type="submit" style={buttonStyle}>
-                    條件式放行
+                    條件放行並進入下一階段
                   </button>
                 </form>
-              ) : null}
+              ) : (
+                <div style={{ color: '#6d5942', marginTop: 10 }}>
+                  目前為硬關卡，請先補齊所有必須的文件。
+                </div>
+              )}
             </>
           ) : (
-            <EmptyPanel
-              title="關卡暫時無法評估"
-              body="系統目前無法判斷此專案是否可推進到下一階段。"
-            />
+            <div style={{ color: '#6d5942', padding: 14 }}>
+              無法結算關卡資訊。
+            </div>
           )}
         </SectionCard>
 
         <SectionCard
           title="建立任務"
-          subtitle="開發任務與專案當前階段刻意脫鉤，讓研發可提前規劃未來階段工作，但系統仍會把風險顯示出來。"
+          subtitle="任務不需受限制，但產出必須綁定文件以留存紀錄。"
           tone="dark"
         >
           <form action={createTaskForm} style={{ display: 'grid', gap: 10 }}>
@@ -404,6 +413,10 @@ export default async function ProjectDetailPage({
                 </option>
               ))}
             </select>
+            <label style={{ fontSize: 13, color: 'rgba(255,244,228,0.7)', marginBottom: -4 }}>預計開始日 (plannedStartDate)</label>
+            <input type="date" name="plannedStartDate" style={inputStyleDark} />
+            <label style={{ fontSize: 13, color: 'rgba(255,244,228,0.7)', marginBottom: -4 }}>預計完成日 (targetDate)</label>
+            <input type="date" name="targetDate" style={inputStyleDark} />
             <select
               name="deliverableIds"
               multiple
@@ -423,6 +436,15 @@ export default async function ProjectDetailPage({
         </SectionCard>
       </div>
 
+      <div style={{ marginBottom: 18 }}>
+        <SectionCard
+          title="專案甘特圖 (Project Timeline)"
+          subtitle="視覺化檢視開發任務的排程與進度狀態。"
+        >
+          <ProjectGantt tasks={project.tasks} />
+        </SectionCard>
+      </div>
+
       <div
         style={{
           display: 'grid',
@@ -439,71 +461,84 @@ export default async function ProjectDetailPage({
             <EmptyPanel title="尚無任務" body="可從右側表單建立第一筆可追溯的 RD 任務。" />
           ) : (
             <div style={{ display: 'grid', gap: 12 }}>
-              {project.tasks.map((task) => (
-                <div
-                  key={task.id}
-                  style={{
-                    borderRadius: 20,
-                    padding: 16,
-                    background: 'rgba(255,255,255,0.54)',
-                  }}
-                >
+              {project.tasks.map((task) => {
+                const taskOverdue = isOverdue(task.targetDate, task.status === 'Done')
+                return (
                   <div
+                    key={task.id}
                     style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      gap: 12,
-                      flexWrap: 'wrap',
+                      borderRadius: 20,
+                      padding: 16,
+                      background: 'rgba(255,255,255,0.54)',
                     }}
                   >
-                    <div>
-                      <div style={{ fontSize: 12, color: '#896945' }}>{task.code}</div>
-                      <div style={{ fontSize: 20, fontWeight: 700 }}>{task.title}</div>
+                    {taskOverdue && (
+                      <div style={{ marginBottom: 8 }}>
+                        <StatusPill label="已延遲" tone="critical" />
+                      </div>
+                    )}
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: 12, color: '#896945' }}>{task.code}</div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>{task.title}</div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <StatusPill
+                          label={formatTaskStatus(task.status)}
+                          tone={
+                            task.status === 'Done'
+                              ? 'good'
+                              : task.status === 'InProgress'
+                                ? 'warn'
+                                : 'neutral'
+                          }
+                        />
+                        <StatusPill
+                          label={`預計階段 ${formatProjectPhase(task.plannedPhase)}`}
+                          tone={task.plannedPhase !== project.currentPhase ? 'warn' : 'neutral'}
+                        />
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <StatusPill
-                        label={formatTaskStatus(task.status)}
-                        tone={
-                          task.status === 'Done'
-                            ? 'good'
-                            : task.status === 'InProgress'
-                              ? 'warn'
-                              : 'neutral'
-                        }
-                      />
-                      <StatusPill
-                        label={`預計階段 ${formatProjectPhase(task.plannedPhase)}`}
-                        tone={task.plannedPhase !== project.currentPhase ? 'warn' : 'neutral'}
-                      />
+                    <div style={{ marginTop: 10, color: '#65513a', lineHeight: 1.6 }}>
+                      {task.description ?? '尚未填寫任務描述。'}
                     </div>
+                    {(task.plannedStartDate || task.targetDate) && (
+                      <div style={{ marginTop: 8, fontSize: 13, color: '#7a5c38', fontFamily: 'monospace' }}>
+                        ⌚ {formatDateShort(task.plannedStartDate)} → {formatDateShort(task.targetDate)}
+                      </div>
+                    )}
+                    <div style={{ marginTop: 10, color: '#5b452c' }}>
+                      綁定文件：
+                      {task.deliverableLinks.map((link) => link.deliverable.code).join(', ')}
+                    </div>
+                    <div style={{ marginTop: 8, color: '#5b452c' }}>
+                      指派給：{task.assignee?.name ?? '未指派'}
+                    </div>
+                    {task.status === 'Todo' ? (
+                      <form action={startTaskForm} style={{ marginTop: 12 }}>
+                        <input type="hidden" name="taskId" value={task.id} />
+                        <button type="submit" style={buttonStyle}>
+                          開始執行
+                        </button>
+                      </form>
+                    ) : task.status === 'InProgress' ? (
+                      <form action={completeTaskForm} style={{ marginTop: 12 }}>
+                        <input type="hidden" name="taskId" value={task.id} />
+                        <button type="submit" style={buttonStyle}>
+                          標記完成
+                        </button>
+                      </form>
+                    ) : null}
                   </div>
-                  <div style={{ marginTop: 10, color: '#65513a', lineHeight: 1.6 }}>
-                    {task.description ?? '尚未填寫任務描述。'}
-                  </div>
-                  <div style={{ marginTop: 10, color: '#5b452c' }}>
-                    綁定文件：
-                    {task.deliverableLinks.map((link) => link.deliverable.code).join(', ')}
-                  </div>
-                  <div style={{ marginTop: 8, color: '#5b452c' }}>
-                    指派給：{task.assignee?.name ?? '未指派'}
-                  </div>
-                  {task.status === 'Todo' ? (
-                    <form action={startTaskForm} style={{ marginTop: 12 }}>
-                      <input type="hidden" name="taskId" value={task.id} />
-                      <button type="submit" style={buttonStyle}>
-                        開始執行
-                      </button>
-                    </form>
-                  ) : task.status === 'InProgress' ? (
-                    <form action={completeTaskForm} style={{ marginTop: 12 }}>
-                      <input type="hidden" name="taskId" value={task.id} />
-                      <button type="submit" style={buttonStyle}>
-                        標記完成
-                      </button>
-                    </form>
-                  ) : null}
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </SectionCard>
@@ -544,6 +579,8 @@ export default async function ProjectDetailPage({
                 </option>
               ))}
             </select>
+            <label style={{ fontSize: 13, color: 'rgba(255,244,228,0.7)', marginBottom: -4 }}>預計交件日 (targetDate)</label>
+            <input type="date" name="targetDate" style={inputStyleDark} />
             <label style={{ display: 'flex', gap: 10, alignItems: 'center', color: '#fff7ec' }}>
               <input type="checkbox" name="isRequired" value="true" defaultChecked />
               納入關卡審查

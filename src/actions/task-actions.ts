@@ -14,6 +14,8 @@ export interface CreateTaskActionInput {
   createdById?: string | null
   plannedPhase: ProjectPhase
   deliverableIds: string[]
+  plannedStartDate?: string | null
+  targetDate?: string | null
 }
 
 export type CreateTaskActionResult = {
@@ -28,7 +30,11 @@ export async function createTaskAction(
   input: CreateTaskActionInput
 ): Promise<CreateTaskActionResult> {
   try {
-    const result = await createTask(input)
+    const result = await createTask({
+      ...input,
+      plannedStartDate: input.plannedStartDate ? new Date(input.plannedStartDate) : null,
+      targetDate: input.targetDate ? new Date(input.targetDate) : null,
+    })
     return { success: true, data: result.task }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

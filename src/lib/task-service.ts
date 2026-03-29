@@ -11,6 +11,8 @@ export interface CreateTaskInput {
   createdById?: string | null
   plannedPhase: ProjectPhase
   deliverableIds: string[]
+  plannedStartDate?: Date | null
+  targetDate?: Date | null
 }
 
 export interface CreateTaskResult {
@@ -74,6 +76,8 @@ export async function createTask(input: CreateTaskInput): Promise<CreateTaskResu
       createdById: input.createdById ?? null,
       plannedPhase: input.plannedPhase,
       status: TaskStatus.Todo,
+      plannedStartDate: input.plannedStartDate ?? null,
+      targetDate: input.targetDate ?? null,
       deliverableLinks: {
         create: input.deliverableIds.map((deliverableId) => ({
           deliverableId,

@@ -11,7 +11,8 @@ export async function POST(
 ) {
   try {
     const { pendingItemId } = await context.params
-    const item = await resolvePendingItem(pendingItemId)
+    const body = await _request.json().catch(() => ({}))
+    const item = await resolvePendingItem(pendingItemId, body.actorId || 'system')
     return NextResponse.json({ success: true, data: item })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

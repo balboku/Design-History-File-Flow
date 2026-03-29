@@ -99,6 +99,7 @@ export interface CreateDeliverableInput {
   ownerId?: string | null
   isRequired?: boolean
   actorId: string
+  targetDate?: Date | null
 }
 
 export interface CreateDeliverableResult {
@@ -159,6 +160,7 @@ export async function createDeliverable(
       phase: input.phase,
       ownerId: input.ownerId ?? null,
       isRequired: input.isRequired ?? true,
+      targetDate: input.targetDate ?? null,
     },
     select: {
       id: true,

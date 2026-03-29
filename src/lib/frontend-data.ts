@@ -23,6 +23,7 @@ export interface ProjectSummary {
   deliverableCount: number
   releasedDeliverableCount: number
   openPendingItemCount: number
+  targetEndDate: Date | null
 }
 
 export interface WorkspaceLookupData {
@@ -90,6 +91,7 @@ export async function getProjectSummaries(): Promise<ProjectSummary[]> {
     openPendingItemCount: project.pendingItems.filter(
       (item) => item.status === PendingItemStatus.Open,
     ).length,
+    targetEndDate: project.targetEndDate,
   }))
 }
 

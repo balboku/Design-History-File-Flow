@@ -87,6 +87,7 @@ model Project {
   currentPhase     ProjectPhase             @default(Concept)
   previousPhase    ProjectPhase?
   ownerId          String?
+  targetEndDate    DateTime?
   createdAt        DateTime                 @default(now())
   updatedAt        DateTime                 @updatedAt
   owner            User?                    @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
@@ -138,6 +139,7 @@ model DeliverablePlaceholder {
   phase              ProjectPhase
   isRequired         Boolean                    @default(true)
   status             DeliverableStatus          @default(Draft)
+  targetDate         DateTime?
   createdAt          DateTime                   @default(now())
   updatedAt          DateTime                   @updatedAt
   lockedAt           DateTime?
@@ -186,6 +188,8 @@ model Task {
   description      String?
   plannedPhase     ProjectPhase
   status           TaskStatus        @default(Todo)
+  plannedStartDate DateTime?
+  targetDate       DateTime?
   startedAt        DateTime?
   completedAt      DateTime?
   createdAt        DateTime          @default(now())

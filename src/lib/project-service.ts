@@ -9,6 +9,7 @@ export interface CreateProjectInput {
   description?: string
   currentPhase?: ProjectPhase
   ownerId?: string | null
+  targetEndDate?: Date | null
 }
 
 export interface CreateProjectResult {
@@ -52,6 +53,7 @@ export async function createProject(
       description: input.description?.trim() || null,
       currentPhase: input.currentPhase ?? ProjectPhase.Concept,
       ownerId: input.ownerId ?? null,
+      targetEndDate: input.targetEndDate ?? null,
     },
     select: {
       id: true,

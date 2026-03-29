@@ -17,6 +17,7 @@ export interface CreateDeliverableActionInput {
   ownerId?: string | null
   isRequired?: boolean
   actorId: string
+  targetDate?: string | null
 }
 
 export type CreateDeliverableActionResult = {
@@ -31,7 +32,10 @@ export async function createDeliverableAction(
   input: CreateDeliverableActionInput,
 ): Promise<CreateDeliverableActionResult> {
   try {
-    const result = await createDeliverable(input)
+    const result = await createDeliverable({
+      ...input,
+      targetDate: input.targetDate ? new Date(input.targetDate) : null,
+    })
     return { success: true, data: result.deliverable }
   } catch (err) {
     return {

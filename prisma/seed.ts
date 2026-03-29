@@ -107,6 +107,7 @@ async function main() {
       currentPhase: ProjectPhase.DesignInput,
       previousPhase: ProjectPhase.Planning,
       ownerId: pm.id,
+      targetEndDate: new Date('2026-09-30T00:00:00.000Z'),
     },
     create: {
       code: 'DEMO-ALPHA',
@@ -115,6 +116,7 @@ async function main() {
       currentPhase: ProjectPhase.DesignInput,
       previousPhase: ProjectPhase.Planning,
       ownerId: pm.id,
+      targetEndDate: new Date('2026-09-30T00:00:00.000Z'),
     },
   })
 
@@ -126,6 +128,7 @@ async function main() {
       currentPhase: ProjectPhase.Validation,
       previousPhase: ProjectPhase.Verification,
       ownerId: pm.id,
+      targetEndDate: new Date('2026-12-31T00:00:00.000Z'),
     },
     create: {
       code: 'DEMO-BETA',
@@ -134,6 +137,7 @@ async function main() {
       currentPhase: ProjectPhase.Validation,
       previousPhase: ProjectPhase.Verification,
       ownerId: pm.id,
+      targetEndDate: new Date('2026-12-31T00:00:00.000Z'),
     },
   })
 
@@ -150,6 +154,7 @@ async function main() {
       ownerId: qa.id,
       status: DeliverableStatus.Released,
       description: 'Product requirements, stakeholder needs, and user story trace bundle.',
+      targetDate: new Date('2026-03-15T00:00:00.000Z'),
     },
     create: {
       projectId: alpha.id,
@@ -159,6 +164,7 @@ async function main() {
       ownerId: qa.id,
       status: DeliverableStatus.Released,
       description: 'Product requirements, stakeholder needs, and user story trace bundle.',
+      targetDate: new Date('2026-03-15T00:00:00.000Z'),
     },
   })
 
@@ -175,6 +181,7 @@ async function main() {
       ownerId: qa.id,
       status: DeliverableStatus.Draft,
       description: 'Mechanical drawings and firmware architecture package.',
+      targetDate: new Date('2026-05-30T00:00:00.000Z'),
     },
     create: {
       projectId: alpha.id,
@@ -184,6 +191,7 @@ async function main() {
       ownerId: qa.id,
       status: DeliverableStatus.Draft,
       description: 'Mechanical drawings and firmware architecture package.',
+      targetDate: new Date('2026-05-30T00:00:00.000Z'),
     },
   })
 
@@ -200,6 +208,7 @@ async function main() {
       ownerId: qa.id,
       status: DeliverableStatus.Draft,
       description: 'Future-phase verification protocol prepared ahead of formal promotion.',
+      targetDate: new Date('2026-07-31T00:00:00.000Z'),
     },
     create: {
       projectId: alpha.id,
@@ -209,6 +218,7 @@ async function main() {
       ownerId: qa.id,
       status: DeliverableStatus.Draft,
       description: 'Future-phase verification protocol prepared ahead of formal promotion.',
+      targetDate: new Date('2026-07-31T00:00:00.000Z'),
     },
   })
 
@@ -301,6 +311,8 @@ async function main() {
       status: TaskStatus.Done,
       assigneeId: rd1.id,
       createdById: pm.id,
+      plannedStartDate: new Date('2026-02-15T00:00:00.000Z'),
+      targetDate: new Date('2026-03-10T00:00:00.000Z'),
       completedAt: new Date('2026-03-10T09:00:00.000Z'),
     },
     create: {
@@ -312,6 +324,8 @@ async function main() {
       status: TaskStatus.Done,
       assigneeId: rd1.id,
       createdById: pm.id,
+      plannedStartDate: new Date('2026-02-15T00:00:00.000Z'),
+      targetDate: new Date('2026-03-10T00:00:00.000Z'),
       completedAt: new Date('2026-03-10T09:00:00.000Z'),
     },
   })
@@ -330,6 +344,8 @@ async function main() {
       status: TaskStatus.InProgress,
       assigneeId: rd2.id,
       createdById: pm.id,
+      plannedStartDate: new Date('2026-03-20T00:00:00.000Z'),
+      targetDate: new Date('2026-05-15T00:00:00.000Z'),
       startedAt: new Date('2026-03-20T09:00:00.000Z'),
     },
     create: {
@@ -341,6 +357,8 @@ async function main() {
       status: TaskStatus.InProgress,
       assigneeId: rd2.id,
       createdById: pm.id,
+      plannedStartDate: new Date('2026-03-20T00:00:00.000Z'),
+      targetDate: new Date('2026-05-15T00:00:00.000Z'),
       startedAt: new Date('2026-03-20T09:00:00.000Z'),
     },
   })
@@ -359,6 +377,8 @@ async function main() {
       status: TaskStatus.Todo,
       assigneeId: rd1.id,
       createdById: pm.id,
+      plannedStartDate: new Date('2026-06-01T00:00:00.000Z'),
+      targetDate: new Date('2026-07-15T00:00:00.000Z'),
     },
     create: {
       projectId: alpha.id,
@@ -369,6 +389,8 @@ async function main() {
       status: TaskStatus.Todo,
       assigneeId: rd1.id,
       createdById: pm.id,
+      plannedStartDate: new Date('2026-06-01T00:00:00.000Z'),
+      targetDate: new Date('2026-07-15T00:00:00.000Z'),
     },
   })
 
@@ -386,6 +408,8 @@ async function main() {
       status: TaskStatus.InProgress,
       assigneeId: rd1.id,
       createdById: pm.id,
+      plannedStartDate: new Date('2026-03-22T00:00:00.000Z'),
+      targetDate: new Date('2026-04-30T00:00:00.000Z'),
       startedAt: new Date('2026-03-22T09:00:00.000Z'),
     },
     create: {
@@ -397,6 +421,8 @@ async function main() {
       status: TaskStatus.InProgress,
       assigneeId: rd1.id,
       createdById: pm.id,
+      plannedStartDate: new Date('2026-03-22T00:00:00.000Z'),
+      targetDate: new Date('2026-04-30T00:00:00.000Z'),
       startedAt: new Date('2026-03-22T09:00:00.000Z'),
     },
   })
@@ -415,6 +441,8 @@ async function main() {
       status: TaskStatus.Todo,
       assigneeId: rd2.id,
       createdById: pm.id,
+      plannedStartDate: new Date('2026-05-01T00:00:00.000Z'),
+      targetDate: new Date('2026-06-30T00:00:00.000Z'),
     },
     create: {
       projectId: beta.id,
@@ -425,6 +453,8 @@ async function main() {
       status: TaskStatus.Todo,
       assigneeId: rd2.id,
       createdById: pm.id,
+      plannedStartDate: new Date('2026-05-01T00:00:00.000Z'),
+      targetDate: new Date('2026-06-30T00:00:00.000Z'),
     },
   })
 

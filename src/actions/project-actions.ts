@@ -8,6 +8,7 @@ export interface CreateProjectActionInput {
   description?: string
   currentPhase?: import('@prisma/client').ProjectPhase
   ownerId?: string | null
+  targetEndDate?: string | null
 }
 
 export type CreateProjectActionResult = {
@@ -22,7 +23,10 @@ export async function createProjectAction(
   input: CreateProjectActionInput,
 ): Promise<CreateProjectActionResult> {
   try {
-    const result = await createProject(input)
+    const result = await createProject({
+      ...input,
+      targetEndDate: input.targetEndDate ? new Date(input.targetEndDate) : null,
+    })
     return { success: true, data: result.project }
   } catch (err) {
     return {

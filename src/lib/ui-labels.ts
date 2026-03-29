@@ -101,3 +101,23 @@ export function formatDateTimeZh(date: Date) {
     timeStyle: 'short',
   }).format(date)
 }
+
+/**
+ * 判斷是否逾期：targetDate 存在、早於今天、且任務/文件尚未完成。
+ */
+export function isOverdue(targetDate: Date | null | undefined, isCompleted: boolean): boolean {
+  if (!targetDate || isCompleted) return false
+  return new Date(targetDate) < new Date()
+}
+
+/**
+ * 格式化日期為 yyyy/MM/dd 格式（用於顯示任務日期區間）
+ */
+export function formatDateShort(date: Date | null | undefined): string {
+  if (!date) return '—'
+  return new Intl.DateTimeFormat('zh-TW', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(date))
+}
