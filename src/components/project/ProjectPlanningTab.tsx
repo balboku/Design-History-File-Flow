@@ -199,8 +199,12 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
                     {task.status === 'Todo' ? (
                       <form
                         action={async (formData: FormData) => {
-                          await startTaskAction(String(formData.get('taskId') ?? ''))
-                          router.refresh()
+                          const res = await startTaskAction(String(formData.get('taskId') ?? ''))
+                          if (!res.success) {
+                            router.push(`?tab=planning&error=${encodeURIComponent(res.error)}`)
+                          } else {
+                            router.refresh()
+                          }
                         }}
                         style={{ marginTop: 12 }}
                       >
@@ -212,8 +216,12 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
                     ) : task.status === 'InProgress' ? (
                       <form
                         action={async (formData: FormData) => {
-                          await completeTaskAction(String(formData.get('taskId') ?? ''))
-                          router.refresh()
+                          const res = await completeTaskAction(String(formData.get('taskId') ?? ''))
+                          if (!res.success) {
+                            router.push(`?tab=planning&error=${encodeURIComponent(res.error)}`)
+                          } else {
+                            router.refresh()
+                          }
                         }}
                         style={{ marginTop: 12 }}
                       >
