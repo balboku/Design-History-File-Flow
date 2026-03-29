@@ -422,6 +422,11 @@ export async function getChangeRequestBoardData() {
           name: true,
         },
       },
+      approver: {
+        select: {
+          name: true,
+        },
+      },
       deliverableLinks: {
         include: {
           deliverable: {

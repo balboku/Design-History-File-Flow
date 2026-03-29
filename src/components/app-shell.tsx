@@ -262,39 +262,25 @@ export function SectionCard({
 
   return (
     <section
-      style={{
-        borderRadius: 28,
-        padding: 22,
-        background: isDark
-          ? 'linear-gradient(180deg, rgba(10, 73, 90, 0.96), rgba(8, 58, 72, 0.94))'
-          : 'var(--app-surface)',
-        color: isDark ? '#f2fbfc' : 'var(--app-text)',
-        border: isDark
-          ? '1px solid rgba(203, 241, 248, 0.12)'
-          : '1px solid var(--app-border)',
-        boxShadow: isDark
-          ? '0 24px 64px rgba(4, 31, 40, 0.22)'
-          : '0 18px 50px rgba(8, 41, 54, 0.08)',
-      }}
+      className={
+        isDark
+          ? 'rounded-[28px] border border-[rgba(203,241,248,0.12)] bg-[linear-gradient(180deg,rgba(10,73,90,0.96),rgba(8,58,72,0.94))] p-[22px] text-[#f2fbfc] shadow-[0_24px_64px_rgba(4,31,40,0.22)]'
+          : 'rounded-[28px] border border-[var(--app-border)] bg-[var(--app-surface)] p-[22px] text-[var(--app-text)] shadow-[0_18px_50px_rgba(8,41,54,0.08)]'
+      }
     >
       <div style={{ marginBottom: 18 }}>
         <h3
-          style={{
-            margin: 0,
-            fontSize: 24,
-            fontFamily:
-              'var(--font-heading), var(--font-body), "Noto Sans TC", sans-serif',
-          }}
+          className='m-0 text-2xl [font-family:var(--font-heading),var(--font-body),"Noto_Sans_TC",sans-serif]'
         >
           {title}
         </h3>
         {subtitle ? (
           <p
-            style={{
-              margin: '6px 0 0',
-              color: isDark ? 'rgba(221, 245, 250, 0.78)' : 'var(--app-text-soft)',
-              lineHeight: 1.7,
-            }}
+            className={
+              isDark
+                ? 'mt-1.5 mb-0 leading-[1.7] text-[rgba(221,245,250,0.78)]'
+                : 'mt-1.5 mb-0 leading-[1.7] text-[var(--app-text-soft)]'
+            }
           >
             {subtitle}
           </p>
@@ -318,22 +304,10 @@ export function MetricCard({
 }) {
   return (
     <div
-      style={{
-        borderRadius: 24,
-        padding: 20,
-        background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(243, 249, 250, 0.94))',
-        border: '1px solid var(--app-border)',
-        boxShadow: '0 18px 42px rgba(8, 41, 54, 0.08)',
-      }}
+      className="rounded-[24px] border border-[var(--app-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(243,249,250,0.94))] p-5 shadow-[0_18px_42px_rgba(8,41,54,0.08)]"
     >
       <div
-        style={{
-          textTransform: 'uppercase',
-          letterSpacing: '0.14em',
-          fontSize: 11,
-          color: 'var(--app-text-soft)',
-          marginBottom: 8,
-        }}
+        className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[var(--app-text-soft)]"
       >
         {label}
       </div>
@@ -375,16 +349,8 @@ export function StatusPill({
 
   return (
     <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        borderRadius: 999,
-        padding: '7px 12px',
-        fontSize: 12,
-        fontWeight: 700,
-        letterSpacing: '0.04em',
-        ...palette,
-      }}
+      className="inline-flex items-center rounded-full px-3 py-[7px] text-xs font-bold tracking-[0.04em]"
+      style={palette}
     >
       {label}
     </span>
@@ -400,26 +366,14 @@ export function EmptyPanel({
 }) {
   return (
     <div
-      style={{
-        borderRadius: 24,
-        padding: '34px 24px',
-        textAlign: 'center',
-        background: 'var(--app-surface-soft)',
-        border: '1px dashed rgba(11, 99, 120, 0.2)',
-      }}
+      className="rounded-[24px] border border-dashed border-[rgba(11,99,120,0.2)] bg-[var(--app-surface-soft)] px-6 py-[34px] text-center"
     >
       <h4
-        style={{
-          margin: '0 0 8px',
-          fontSize: 22,
-          color: 'var(--app-text)',
-          fontFamily:
-            'var(--font-heading), var(--font-body), "Noto Sans TC", sans-serif',
-        }}
+        className='m-0 mb-2 text-[22px] text-[var(--app-text)] [font-family:var(--font-heading),var(--font-body),"Noto_Sans_TC",sans-serif]'
       >
         {title}
       </h4>
-      <p style={{ margin: 0, lineHeight: 1.7, color: 'var(--app-text-soft)' }}>{body}</p>
+      <p className="m-0 leading-[1.7] text-[var(--app-text-soft)]">{body}</p>
     </div>
   )
 }
@@ -451,16 +405,8 @@ export function ActionLink({
   return (
     <Link
       href={href}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 999,
-        padding: '13px 18px',
-        fontWeight: 700,
-        textDecoration: 'none',
-        ...style,
-      }}
+      className="inline-flex items-center justify-center rounded-full px-[18px] py-[13px] font-bold no-underline transition hover:-translate-y-0.5"
+      style={style}
     >
       {label}
     </Link>

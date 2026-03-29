@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 :root {
   --font-heading: "Avenir Next", "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
   --font-body: "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;

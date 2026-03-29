@@ -1,7 +1,7 @@
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import { DeliverableStatus, ProjectPhase } from '@prisma/client'
+import { ChangeRequestStatus, DeliverableStatus, ProjectPhase } from '@prisma/client'
 
 import { syncPendingItems } from './pending-item-service'
 import { prisma } from './prisma'
@@ -10,6 +10,17 @@ export const FILE_UPLOAD_ERROR =
   'Please choose a file to upload before logging a revision.'
 export const LOCKED_DELIVERABLE_CHANGE_REQUEST_ERROR =
   'Locked deliverables require a linked Change Request before a new revision can be uploaded.'
+export const LOCKED_DELIVERABLE_STATUS_CHANGE_ERROR =
+  'Locked deliverables cannot be directly unlocked. Create a Change Request and upload a new revision instead.'
+export const LOCKED_DELIVERABLE_APPROVED_CHANGE_REQUEST_ERROR =
+  'Locked deliverables require an approved Change Request before a new revision can be uploaded.'
+
+const APPROVED_CHANGE_REQUEST_STATUSES: ChangeRequestStatus[] = [
+  ChangeRequestStatus.Approved,
+  ChangeRequestStatus.Active,
+  ChangeRequestStatus.Implemented,
+  ChangeRequestStatus.Closed,
+]
 
 const REVISION_STORAGE_ROOT = path.join(process.cwd(), 'storage', 'revisions')
 
@@ -215,7 +226,7 @@ export async function createFileRevision(
   if (input.changeRequestId) {
     const request = await prisma.changeRequest.findUnique({
       where: { id: input.changeRequestId },
-      select: { id: true, projectId: true },
+      select: { id: true, projectId: true, status: true },
     })
 
     if (!request) {
@@ -224,6 +235,13 @@ export async function createFileRevision(
 
     if (request.projectId && request.projectId !== deliverable.projectId) {
       throw new Error('Linked Change Request does not belong to the same project.')
+    }
+
+    if (
+      deliverable.status === DeliverableStatus.Locked &&
+      !APPROVED_CHANGE_REQUEST_STATUSES.includes(request.status)
+    ) {
+      throw new Error(LOCKED_DELIVERABLE_APPROVED_CHANGE_REQUEST_ERROR)
     }
   }
 
@@ -346,11 +364,16 @@ export async function updateDeliverableStatus(
     select: {
       id: true,
       projectId: true,
+      status: true,
     },
   })
 
   if (!existing) {
     throw new Error(`Deliverable not found: ${input.deliverableId}`)
+  }
+
+  if (existing.status === DeliverableStatus.Locked && input.status !== DeliverableStatus.Locked) {
+    throw new Error(LOCKED_DELIVERABLE_STATUS_CHANGE_ERROR)
   }
 
   const deliverable = await prisma.deliverablePlaceholder.update({

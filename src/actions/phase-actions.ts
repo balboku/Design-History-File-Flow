@@ -51,7 +51,13 @@ export interface AdvancePhaseActionInput {
   rationale?: string
 }
 
-export type AdvancePhaseActionResult = Awaited<ReturnType<typeof advancePhase>>
+export type AdvancePhaseActionResult =
+  | Awaited<ReturnType<typeof advancePhase>>
+  | {
+      success: false
+      reason: 'validation_error'
+      message: string
+    }
 
 export async function advancePhaseAction(
   input: AdvancePhaseActionInput,
@@ -63,7 +69,10 @@ export async function advancePhaseAction(
       rationale: input.rationale,
     })
   } catch (err) {
-    // Re-throw domain errors as-is; let callers handle them
-    throw err
+    return {
+      success: false,
+      reason: 'validation_error',
+      message: err instanceof Error ? err.message : String(err),
+    }
   }
 }

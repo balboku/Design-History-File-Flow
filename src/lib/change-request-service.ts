@@ -2,6 +2,23 @@ import { ChangeRequestStatus } from '@prisma/client'
 
 import { prisma } from './prisma'
 
+const CHANGE_REQUEST_WORKFLOW: Record<ChangeRequestStatus, ChangeRequestStatus[]> = {
+  Draft: [ChangeRequestStatus.Submitted],
+  Active: [ChangeRequestStatus.Implemented],
+  Submitted: [ChangeRequestStatus.InReview],
+  InReview: [ChangeRequestStatus.Approved, ChangeRequestStatus.Rejected],
+  Approved: [ChangeRequestStatus.Active],
+  Rejected: [],
+  Implemented: [ChangeRequestStatus.Closed],
+  Closed: [],
+}
+
+export const CHANGE_REQUEST_APPROVAL_ERROR =
+  'Approved or rejected change requests must record an approver.'
+
+export const CHANGE_REQUEST_WORKFLOW_ERROR =
+  'The requested Change Request status transition is not allowed.'
+
 export interface CreateChangeRequestInput {
   code: string
   title: string
@@ -24,11 +41,36 @@ export interface CreateChangeRequestResult {
   }
 }
 
+export interface TransitionChangeRequestInput {
+  changeRequestId: string
+  nextStatus: ChangeRequestStatus
+  actedById?: string | null
+}
+
+export interface TransitionChangeRequestResult {
+  changeRequest: {
+    id: string
+    code: string
+    status: ChangeRequestStatus
+    approverId: string | null
+    submittedAt: Date | null
+    approvedAt: Date | null
+    implementedAt: Date | null
+  }
+}
+
+export function getAllowedChangeRequestTransitions(
+  status: ChangeRequestStatus,
+): ChangeRequestStatus[] {
+  return CHANGE_REQUEST_WORKFLOW[status] ?? []
+}
+
 export async function createChangeRequest(
   input: CreateChangeRequestInput,
 ): Promise<CreateChangeRequestResult> {
   const code = input.code.trim()
   const title = input.title.trim()
+  const impactAnalysis = input.impactAnalysis?.trim()
   const deliverableIds = [...new Set(input.deliverableIds ?? [])]
   const partComponentIds = [...new Set(input.partComponentIds ?? [])]
 
@@ -38,6 +80,10 @@ export async function createChangeRequest(
 
   if (!title) {
     throw new Error('Change request title is required.')
+  }
+
+  if (!impactAnalysis) {
+    throw new Error('Impact analysis is required for every change request.')
   }
 
   if (!input.projectId && deliverableIds.length === 0 && partComponentIds.length === 0) {
@@ -110,7 +156,7 @@ export async function createChangeRequest(
       code,
       title,
       description: input.description?.trim() || null,
-      impactAnalysis: input.impactAnalysis?.trim() || null,
+      impactAnalysis,
       requesterId: input.requesterId ?? null,
       status: input.status ?? ChangeRequestStatus.Draft,
       deliverableLinks: {
@@ -134,4 +180,91 @@ export async function createChangeRequest(
   })
 
   return { changeRequest }
+}
+
+export async function transitionChangeRequest(
+  input: TransitionChangeRequestInput,
+): Promise<TransitionChangeRequestResult> {
+  const changeRequest = await prisma.changeRequest.findUnique({
+    where: { id: input.changeRequestId },
+    select: {
+      id: true,
+      code: true,
+      status: true,
+      requesterId: true,
+      approverId: true,
+      submittedAt: true,
+      approvedAt: true,
+      implementedAt: true,
+    },
+  })
+
+  if (!changeRequest) {
+    throw new Error(`Change request not found: ${input.changeRequestId}`)
+  }
+
+  const allowedTransitions = getAllowedChangeRequestTransitions(changeRequest.status)
+  if (!allowedTransitions.includes(input.nextStatus)) {
+    throw new Error(
+      `${CHANGE_REQUEST_WORKFLOW_ERROR} (${changeRequest.status} -> ${input.nextStatus})`,
+    )
+  }
+
+  const actedById = input.actedById?.trim() || null
+
+  if (
+    (input.nextStatus === ChangeRequestStatus.Approved ||
+      input.nextStatus === ChangeRequestStatus.Rejected) &&
+    !actedById
+  ) {
+    throw new Error(CHANGE_REQUEST_APPROVAL_ERROR)
+  }
+
+  if (actedById) {
+    const actor = await prisma.user.findUnique({
+      where: { id: actedById },
+      select: { id: true },
+    })
+
+    if (!actor) {
+      throw new Error(`Change request actor not found: ${actedById}`)
+    }
+  }
+
+  const now = new Date()
+
+  const updated = await prisma.changeRequest.update({
+    where: { id: input.changeRequestId },
+    data: {
+      status: input.nextStatus,
+      submittedAt:
+        input.nextStatus === ChangeRequestStatus.Submitted
+          ? changeRequest.submittedAt ?? now
+          : undefined,
+      approverId:
+        input.nextStatus === ChangeRequestStatus.Approved ||
+        input.nextStatus === ChangeRequestStatus.Rejected
+          ? actedById
+          : undefined,
+      approvedAt:
+        input.nextStatus === ChangeRequestStatus.Approved
+          ? now
+          : undefined,
+      implementedAt:
+        input.nextStatus === ChangeRequestStatus.Implemented
+          ? now
+          : undefined,
+    },
+    select: {
+      id: true,
+      code: true,
+      status: true,
+      approverId: true,
+      submittedAt: true,
+      approvedAt: true,
+      implementedAt: true,
+    },
+  })
+
+  return { changeRequest: updated }
 }

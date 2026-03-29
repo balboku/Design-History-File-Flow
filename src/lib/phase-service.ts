@@ -1,5 +1,6 @@
 import { prisma } from './prisma'
 import {
+  Prisma,
   ProjectPhase,
   DeliverableStatus,
   PendingItemStatus,
@@ -68,11 +69,18 @@ export interface AdvancePhaseHardGate {
   issues: PhaseGateIssue[]
 }
 
+export interface AdvancePhaseValidationError {
+  success: false
+  reason: 'validation_error'
+  message: string
+}
+
 export type AdvancePhaseResult =
   | AdvancePhaseSuccess
   | AdvancePhaseForced
   | AdvancePhaseWarning
   | AdvancePhaseHardGate
+  | AdvancePhaseValidationError
 
 // ─── Phase ordering ───────────────────────────────────────────────────────────
 
@@ -209,6 +217,24 @@ function dedupeIssuesByDeliverable(issues: PhaseGateIssue[]): PhaseGateIssue[] {
   return [...map.values()]
 }
 
+async function lockTransferredDeliverables(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+) {
+  const now = new Date()
+
+  await tx.deliverablePlaceholder.updateMany({
+    where: {
+      projectId,
+      status: DeliverableStatus.Released,
+    },
+    data: {
+      status: DeliverableStatus.Locked,
+      lockedAt: now,
+    },
+  })
+}
+
 // ─── Phase Advance ────────────────────────────────────────────────────────────
 
 /**
@@ -251,11 +277,26 @@ export async function advancePhase(
         const target = getNextPhase(current.currentPhase)
         if (!target) throw new Error('Already at final phase')
 
+        await tx.phaseTransition.create({
+          data: {
+            projectId,
+            fromPhase: current.currentPhase,
+            toPhase: target,
+            triggeredById: null,
+            wasOverride: false,
+            overrideReason: null,
+          },
+        })
+
         const updatedProject = await tx.project.update({
           where: { id: projectId },
           data: { currentPhase: target, previousPhase: current.currentPhase },
           select: { id: true, code: true, name: true, currentPhase: true },
         })
+
+        if (target === ProjectPhase.DesignTransfer) {
+          await lockTransferredDeliverables(tx, projectId)
+        }
 
         return {
           previousPhase: current.currentPhase,
@@ -305,6 +346,14 @@ export async function advancePhase(
       isHardGate: false,
       message: `以下 ${issues.length} 項文件尚未 Released，請完成後再推進，或使用 forceOverride 參數強制推進：\n${list}`,
       issues,
+    }
+  }
+
+  if (!options.overriddenById) {
+    return {
+      success: false,
+      reason: 'validation_error',
+      message: '條件式放行必須指定核准者，才能保留完整稽核紀錄。',
     }
   }
 
@@ -363,6 +412,10 @@ export async function advancePhase(
         data: { currentPhase: target, previousPhase: current.currentPhase },
         select: { id: true, code: true, name: true, currentPhase: true },
       })
+
+      if (target === ProjectPhase.DesignTransfer) {
+        await lockTransferredDeliverables(tx, projectId)
+      }
 
       return {
         previousPhase: current.currentPhase,

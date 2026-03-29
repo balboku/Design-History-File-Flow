@@ -79,13 +79,14 @@ export async function POST(req: NextRequest) {
       rationale,
     })
 
-    // 2xx for all success cases (including "warning" and "forced")
     const status =
       result.success && 'outcome' in result
         ? result.outcome === 'warning' || result.outcome === 'forced'
           ? 202
           : 200
-        : 409
+        : result.reason === 'validation_error'
+          ? 400
+          : 409
 
     return NextResponse.json(result, { status })
   } catch (err) {

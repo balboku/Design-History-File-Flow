@@ -1,8 +1,11 @@
 import type { CSSProperties } from 'react'
-import { ChangeRequestStatus } from '@prisma/client'
+import { ChangeRequestStatus, Role } from '@prisma/client'
 import { redirect } from 'next/navigation'
 
-import { createChangeRequestAction } from '@/actions/change-request-actions'
+import {
+  createChangeRequestAction,
+  transitionChangeRequestAction,
+} from '@/actions/change-request-actions'
 import {
   ActionLink,
   AppShell,
@@ -15,8 +18,10 @@ import {
   getChangeRequestBoardData,
   getWorkspaceLookupData,
 } from '@/lib/frontend-data'
+import { getAllowedChangeRequestTransitions } from '@/lib/change-request-service'
 import {
   formatChangeRequestStatus,
+  formatDateTimeZh,
   formatRole,
 } from '@/lib/ui-labels'
 
@@ -65,6 +70,26 @@ export default async function ChangeRequestsPage({
     redirect(buildUrl({ error: result.error }))
   }
 
+  async function transitionChangeRequestForm(formData: FormData) {
+    'use server'
+
+    const result = await transitionChangeRequestAction({
+      changeRequestId: String(formData.get('changeRequestId') ?? ''),
+      nextStatus: String(formData.get('nextStatus') ?? ChangeRequestStatus.Draft) as ChangeRequestStatus,
+      actedById: String(formData.get('actedById') ?? '') || undefined,
+    })
+
+    if (result.success) {
+      redirect(
+        buildUrl({
+          notice: `變更單 ${result.data.code} 已更新為 ${formatChangeRequestStatus(result.data.status)}`,
+        }),
+      )
+    }
+
+    redirect(buildUrl({ error: result.error }))
+  }
+
   const approvedCount = changeRequests.filter(
     (item) => item.status === ChangeRequestStatus.Approved || item.status === ChangeRequestStatus.Implemented,
   ).length
@@ -74,6 +99,7 @@ export default async function ChangeRequestsPage({
       item.status === ChangeRequestStatus.Submitted ||
       item.status === ChangeRequestStatus.InReview,
   ).length
+  const approverOptions = lookup.users.filter((user) => user.role !== Role.RD)
 
   return (
     <AppShell
@@ -139,6 +165,7 @@ export default async function ChangeRequestsPage({
             <textarea
               name="impactAnalysis"
               placeholder="影響評估"
+              required
               style={{ ...darkInputStyle, minHeight: 120, resize: 'vertical' }}
             />
             <select name="projectId" defaultValue="" style={darkInputStyle}>
@@ -226,12 +253,7 @@ export default async function ChangeRequestsPage({
             {changeRequests.map((changeRequest) => (
               <div
                 key={changeRequest.id}
-                style={{
-                  borderRadius: 22,
-                  padding: 18,
-                  background: 'rgba(255,248,239,0.72)',
-                  border: '1px solid rgba(73, 52, 27, 0.12)',
-                }}
+                className="rounded-[22px] border border-[rgba(73,52,27,0.12)] bg-[rgba(255,248,239,0.72)] p-[18px] shadow-[0_12px_28px_rgba(57,37,16,0.06)]"
               >
                 <div
                   style={{
@@ -266,6 +288,9 @@ export default async function ChangeRequestsPage({
                 <div style={{ color: '#5a4631', lineHeight: 1.6 }}>
                   {changeRequest.description ?? '尚未填寫變更內容。'}
                 </div>
+                <div style={{ marginTop: 8, color: '#5a4631' }}>
+                  影響評估：{changeRequest.impactAnalysis ?? '尚未填寫'}
+                </div>
                 <div style={{ marginTop: 10, color: '#5a4631' }}>
                   提出人：{changeRequest.requester?.name ?? '尚未指派'} · 影響文件：
                   {changeRequest.deliverableLinks.length > 0
@@ -282,6 +307,49 @@ export default async function ChangeRequestsPage({
                         .join(', ')
                     : '無'}
                 </div>
+                <div style={{ marginTop: 8, color: '#5a4631', lineHeight: 1.7 }}>
+                  送審：{changeRequest.submittedAt ? formatDateTimeZh(changeRequest.submittedAt) : '尚未送審'} ·
+                  核准：{changeRequest.approvedAt ? formatDateTimeZh(changeRequest.approvedAt) : '尚未核准'} ·
+                  實施：{changeRequest.implementedAt ? formatDateTimeZh(changeRequest.implementedAt) : '尚未實施'}
+                </div>
+                <div style={{ marginTop: 8, color: '#5a4631' }}>
+                  審查 / 核准者：{changeRequest.approver?.name ?? '尚未指定'}
+                </div>
+                {getAllowedChangeRequestTransitions(changeRequest.status).length > 0 ? (
+                  <form
+                    action={transitionChangeRequestForm}
+                    className="mt-4 grid gap-3 rounded-[18px] border border-[rgba(73,52,27,0.1)] bg-[rgba(255,255,255,0.48)] p-4"
+                  >
+                    <input type="hidden" name="changeRequestId" value={changeRequest.id} />
+                    {getAllowedChangeRequestTransitions(changeRequest.status).some(
+                      (status) =>
+                        status === ChangeRequestStatus.Approved ||
+                        status === ChangeRequestStatus.Rejected,
+                    ) ? (
+                      <select name="actedById" defaultValue="" style={baseInputStyle}>
+                        <option value="">選擇審查 / 核准者</option>
+                        {approverOptions.map((user) => (
+                          <option key={user.id} value={user.id}>
+                            {user.name} · {formatRole(user.role)}
+                          </option>
+                        ))}
+                      </select>
+                    ) : null}
+                    <div className="flex flex-wrap gap-2">
+                      {getAllowedChangeRequestTransitions(changeRequest.status).map((status) => (
+                        <button
+                          key={status}
+                          type="submit"
+                          name="nextStatus"
+                          value={status}
+                          className="rounded-full border border-[var(--app-border)] bg-white/80 px-4 py-2 font-bold text-[var(--app-primary-strong)] transition hover:-translate-y-0.5 hover:bg-white"
+                        >
+                          轉為{formatChangeRequestStatus(status)}
+                        </button>
+                      ))}
+                    </div>
+                  </form>
+                ) : null}
               </div>
             ))}
           </div>

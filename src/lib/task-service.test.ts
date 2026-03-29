@@ -9,6 +9,19 @@ import {
   PENDING_ITEM_RESOLUTION_ERROR,
 } from './pending-item-service'
 import {
+  CHANGE_REQUEST_APPROVAL_ERROR,
+  CHANGE_REQUEST_WORKFLOW_ERROR,
+  createChangeRequest,
+  transitionChangeRequest,
+} from './change-request-service'
+import {
+  LOCKED_DELIVERABLE_APPROVED_CHANGE_REQUEST_ERROR,
+  LOCKED_DELIVERABLE_STATUS_CHANGE_ERROR,
+  createFileRevision,
+  updateDeliverableStatus,
+} from './deliverable-service'
+import {
+  ChangeRequestStatus,
   ProjectPhase,
   TaskStatus,
   DeliverableStatus,
@@ -565,6 +578,14 @@ describe('advancePhase', () => {
     if (result.outcome === 'advanced') {
       expect(result.project.currentPhase).toBe(ProjectPhase.DesignInput)
     }
+
+    const transitions = await prisma.phaseTransition.findMany({
+      where: { projectId: project.id },
+    })
+    expect(transitions).toHaveLength(1)
+    expect(transitions[0].wasOverride).toBe(false)
+    expect(transitions[0].fromPhase).toBe(ProjectPhase.Planning)
+    expect(transitions[0].toPhase).toBe(ProjectPhase.DesignInput)
   })
 
   it('gate 失敗且無 forceOverride 時，回傳 warning 結果與詳細錯誤清單', async () => {
@@ -604,6 +625,22 @@ describe('advancePhase', () => {
     expect(transitions[0].wasOverride).toBe(true)
     expect(transitions[0].overrideReason).toBe('Due to schedule pressure')
   })
+
+  it('forceOverride=true 但未提供 overriddenById 時，回傳 validation_error', async () => {
+    const project = await setupProjectWithPhase(ProjectPhase.Planning)
+    await setupDeliverableForPhase(project.id, ProjectPhase.Planning, DeliverableStatus.Draft)
+
+    const result = await advancePhase(project.id, {
+      forceOverride: true,
+      rationale: 'Missing approver should fail',
+    })
+
+    expect(result.success).toBe(false)
+    if (result.success) {
+      throw new Error('Expected validation_error result')
+    }
+    expect(result.reason).toBe('validation_error')
+  })
 })
 
 // ─── Tests: DesignTransfer Hard Gate ─────────────────────────────────────────
@@ -611,7 +648,11 @@ describe('advancePhase', () => {
 describe('DesignTransfer hard gate', () => {
   it('所有 deliverables 都是 Released 時，可以推進到 DesignTransfer (outcome: advanced)', async () => {
     const project = await setupProjectWithPhase(ProjectPhase.Validation)
-    await setupDeliverableForPhase(project.id, ProjectPhase.Validation, DeliverableStatus.Released)
+    const deliverable = await setupDeliverableForPhase(
+      project.id,
+      ProjectPhase.Validation,
+      DeliverableStatus.Released,
+    )
 
     const result = await advancePhase(project.id)
     expect(result.success).toBe(true)
@@ -619,6 +660,12 @@ describe('DesignTransfer hard gate', () => {
     if (result.outcome === 'advanced') {
       expect(result.project.currentPhase).toBe(ProjectPhase.DesignTransfer)
     }
+
+    const refreshed = await prisma.deliverablePlaceholder.findUnique({
+      where: { id: deliverable.id },
+    })
+    expect(refreshed?.status).toBe(DeliverableStatus.Locked)
+    expect(refreshed?.lockedAt).not.toBeNull()
   })
 
   it('有 incomplete deliverables 時，即使提供 forceOverride 也回傳 hard_gate 錯誤', async () => {
@@ -652,5 +699,156 @@ describe('DesignTransfer hard gate', () => {
     if (result.outcome === 'advanced') {
       expect(result.project.currentPhase).toBe(ProjectPhase.Validation)
     }
+  })
+
+  it('進入 DesignTransfer 後，Locked deliverable 不能直接解鎖', async () => {
+    const project = await setupProjectWithPhase(ProjectPhase.Validation)
+    const deliverable = await setupDeliverableForPhase(
+      project.id,
+      ProjectPhase.Validation,
+      DeliverableStatus.Released,
+    )
+
+    const result = await advancePhase(project.id)
+    expect(result.success).toBe(true)
+    expect(result.outcome).toBe('advanced')
+
+    await expect(
+      updateDeliverableStatus({
+        deliverableId: deliverable.id,
+        status: DeliverableStatus.Released,
+      }),
+    ).rejects.toThrow(LOCKED_DELIVERABLE_STATUS_CHANGE_ERROR)
+  })
+})
+
+describe('change request rules', () => {
+  it('建立 ChangeRequest 時若缺少 impact analysis，會被阻擋', async () => {
+    const project = await setupProject()
+
+    await expect(
+      createChangeRequest({
+        code: `CR-${uid()}`,
+        title: 'Missing impact analysis',
+        projectId: project.id,
+      }),
+    ).rejects.toThrow('Impact analysis is required for every change request.')
+  })
+
+  it('建立 ChangeRequest 時有 impact analysis 且關聯專案，則可成功建立', async () => {
+    const project = await setupProject()
+
+    const result = await createChangeRequest({
+      code: `CR-${uid()}`,
+      title: 'Valid change request',
+      projectId: project.id,
+      impactAnalysis: 'Regulatory, verification, and documentation impact reviewed.',
+    })
+
+    expect(result.changeRequest.projectId).toBe(project.id)
+    expect(result.changeRequest.status).toBe('Draft')
+  })
+
+  it('變更單必須依照正式 workflow 流轉，不能直接從 Draft 跳到 Approved', async () => {
+    const project = await setupProject()
+    const created = await createChangeRequest({
+      code: `CR-${uid()}`,
+      title: 'Workflow change request',
+      projectId: project.id,
+      impactAnalysis: 'Workflow transition impact reviewed.',
+    })
+
+    await expect(
+      transitionChangeRequest({
+        changeRequestId: created.changeRequest.id,
+        nextStatus: ChangeRequestStatus.Approved,
+        actedById: testUserId,
+      }),
+    ).rejects.toThrow(CHANGE_REQUEST_WORKFLOW_ERROR)
+  })
+
+  it('變更單核准時必須指定 approver，且會寫入時間戳', async () => {
+    const project = await setupProject()
+    const created = await createChangeRequest({
+      code: `CR-${uid()}`,
+      title: 'Approval metadata change request',
+      projectId: project.id,
+      impactAnalysis: 'Approval metadata impact reviewed.',
+    })
+
+    await transitionChangeRequest({
+      changeRequestId: created.changeRequest.id,
+      nextStatus: ChangeRequestStatus.Submitted,
+    })
+    await transitionChangeRequest({
+      changeRequestId: created.changeRequest.id,
+      nextStatus: ChangeRequestStatus.InReview,
+    })
+
+    await expect(
+      transitionChangeRequest({
+        changeRequestId: created.changeRequest.id,
+        nextStatus: ChangeRequestStatus.Approved,
+      }),
+    ).rejects.toThrow(CHANGE_REQUEST_APPROVAL_ERROR)
+
+    const approved = await transitionChangeRequest({
+      changeRequestId: created.changeRequest.id,
+      nextStatus: ChangeRequestStatus.Approved,
+      actedById: testUserId,
+    })
+
+    expect(approved.changeRequest.status).toBe(ChangeRequestStatus.Approved)
+    expect(approved.changeRequest.approverId).toBe(testUserId)
+    expect(approved.changeRequest.approvedAt).not.toBeNull()
+  })
+
+  it('Locked deliverable 只有在 linked CR 已核准後才能新增 revision', async () => {
+    const project = await setupProjectWithPhase(ProjectPhase.DesignTransfer)
+    const deliverable = await setupDeliverableForPhase(
+      project.id,
+      ProjectPhase.DesignTransfer,
+      DeliverableStatus.Locked,
+    )
+
+    const draftRequest = await createChangeRequest({
+      code: `CR-${uid()}`,
+      title: 'Draft CR',
+      projectId: project.id,
+      impactAnalysis: 'Draft CR impact analysis.',
+      deliverableIds: [deliverable.id],
+    })
+
+    await expect(
+      createFileRevision({
+        deliverableId: deliverable.id,
+        fileName: 'locked-draft.pdf',
+        storagePath: 'storage/revisions/test/locked-draft.pdf',
+        changeRequestId: draftRequest.changeRequest.id,
+      }),
+    ).rejects.toThrow(LOCKED_DELIVERABLE_APPROVED_CHANGE_REQUEST_ERROR)
+
+    await transitionChangeRequest({
+      changeRequestId: draftRequest.changeRequest.id,
+      nextStatus: ChangeRequestStatus.Submitted,
+    })
+    await transitionChangeRequest({
+      changeRequestId: draftRequest.changeRequest.id,
+      nextStatus: ChangeRequestStatus.InReview,
+    })
+    await transitionChangeRequest({
+      changeRequestId: draftRequest.changeRequest.id,
+      nextStatus: ChangeRequestStatus.Approved,
+      actedById: testUserId,
+    })
+
+    const revision = await createFileRevision({
+      deliverableId: deliverable.id,
+      fileName: 'locked-approved.pdf',
+      storagePath: 'storage/revisions/test/locked-approved.pdf',
+      changeRequestId: draftRequest.changeRequest.id,
+    })
+
+    expect(revision.revision.revisionNumber).toBe(1)
   })
 })
