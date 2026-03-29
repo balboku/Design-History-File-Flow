@@ -2,12 +2,14 @@ import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest'
 import { execSync } from 'child_process'
 import { prisma } from './prisma'
 import { createTask, completeTask, TASK_COMPLETION_ERROR } from './task-service'
+import { advancePhase, evaluatePhaseGate } from './phase-service'
 import { ProjectPhase, TaskStatus, DeliverableStatus } from '@prisma/client'
 
 // Use a separate test SQLite DB
 process.env.DATABASE_URL = 'file:./test.db'
 
 let counter = 0
+let testUserId = ''
 
 beforeAll(async () => {
   execSync('npx prisma db push --force-reset', {
@@ -20,6 +22,15 @@ beforeAll(async () => {
     },
     stdio: 'pipe',
   })
+  // Create a test user for override audit trail
+  const user = await prisma.user.create({
+    data: {
+      email: `testuser-${Date.now()}@example.com`,
+      name: 'Test PM',
+      role: 'PM',
+    },
+  })
+  testUserId = user.id
 })
 
 afterEach(async () => {
@@ -28,10 +39,12 @@ afterEach(async () => {
   await prisma.task.deleteMany()
   await prisma.fileRevision.deleteMany()
   await prisma.deliverablePlaceholder.deleteMany()
+  await prisma.phaseTransition.deleteMany()
   await prisma.project.deleteMany()
 })
 
 afterAll(async () => {
+  await prisma.user.deleteMany()
   await prisma.$disconnect()
 })
 
@@ -242,5 +255,190 @@ describe('completeTask', () => {
     })
 
     await expect(completeTask(result.task.id)).rejects.toThrow(TASK_COMPLETION_ERROR)
+  })
+})
+
+// ─── Phase Gate Helpers ─────────────────────────────────────────────────────────
+
+async function setupProjectWithPhase(phase: ProjectPhase) {
+  return prisma.project.create({
+    data: {
+      code: `PRJ-${uid()}`,
+      name: 'Test Project',
+      currentPhase: phase,
+    },
+  })
+}
+
+async function setupDeliverableForPhase(
+  projectId: string,
+  phase: ProjectPhase,
+  status: DeliverableStatus,
+) {
+  return prisma.deliverablePlaceholder.create({
+    data: {
+      projectId,
+      code: `DEL-${uid()}`,
+      title: `Deliverable`,
+      phase,
+      status,
+    },
+  })
+}
+
+// ─── Tests: evaluatePhaseGate ──────────────────────────────────────────────────
+
+describe('evaluatePhaseGate', () => {
+  it('所有 required deliverables 都是 Released 時，gate 通過', async () => {
+    const project = await setupProjectWithPhase(ProjectPhase.Planning)
+    await setupDeliverableForPhase(project.id, ProjectPhase.Planning, DeliverableStatus.Released)
+    await setupDeliverableForPhase(project.id, ProjectPhase.Planning, DeliverableStatus.Released)
+
+    const result = await evaluatePhaseGate(project.id)
+    expect(result.canAdvance).toBe(true)
+    expect(result.nextPhase).toBe(ProjectPhase.DesignInput)
+  })
+
+  it('有任何 required deliverable 不是 Released 時，gate 失敗並列出詳細問題', async () => {
+    const project = await setupProjectWithPhase(ProjectPhase.Planning)
+    await setupDeliverableForPhase(project.id, ProjectPhase.Planning, DeliverableStatus.Released)
+    await setupDeliverableForPhase(project.id, ProjectPhase.Planning, DeliverableStatus.Draft)
+
+    const result = await evaluatePhaseGate(project.id)
+    expect(result.canAdvance).toBe(false)
+    expect(result.isHardGate).toBe(false)
+    expect(result.issues).toHaveLength(1)
+    expect(result.issues[0].reason).toContain('草稿')
+  })
+
+  it('isRequired=false 的 deliverable 未 Released，不阻擋 gate', async () => {
+    const project = await setupProjectWithPhase(ProjectPhase.Planning)
+    await setupDeliverableForPhase(project.id, ProjectPhase.Planning, DeliverableStatus.Released)
+    await prisma.deliverablePlaceholder.create({
+      data: {
+        projectId: project.id,
+        code: `DEL-OPT-${uid()}`,
+        title: 'Optional Deliverable',
+        phase: ProjectPhase.Planning,
+        status: DeliverableStatus.Draft,
+        isRequired: false,
+      },
+    })
+
+    const result = await evaluatePhaseGate(project.id)
+    expect(result.canAdvance).toBe(true)
+  })
+
+  it('不同 phase 的 incomplete deliverables 不影響當前 soft gate', async () => {
+    const project = await setupProjectWithPhase(ProjectPhase.Planning)
+    await setupDeliverableForPhase(project.id, ProjectPhase.Planning, DeliverableStatus.Released)
+    // Future-phase incomplete deliverable
+    await setupDeliverableForPhase(project.id, ProjectPhase.DesignInput, DeliverableStatus.Draft)
+
+    const result = await evaluatePhaseGate(project.id)
+    expect(result.canAdvance).toBe(true)
+  })
+
+  it('專案不存在時拋出錯誤', async () => {
+    await expect(evaluatePhaseGate('non-existent-id')).rejects.toThrow('Project not found')
+  })
+})
+
+// ─── Tests: advancePhase ───────────────────────────────────────────────────────
+
+describe('advancePhase', () => {
+  it('gate 通過時，推進階段成功', async () => {
+    const project = await setupProjectWithPhase(ProjectPhase.Planning)
+    await setupDeliverableForPhase(project.id, ProjectPhase.Planning, DeliverableStatus.Released)
+
+    const result = await advancePhase(project.id)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.project.currentPhase).toBe(ProjectPhase.DesignInput)
+      expect(result.wasOverridden).toBe(false)
+    }
+  })
+
+  it('gate 失敗且無 override 時，回傳 blocked 結果與詳細錯誤清單', async () => {
+    const project = await setupProjectWithPhase(ProjectPhase.Planning)
+    await setupDeliverableForPhase(project.id, ProjectPhase.Planning, DeliverableStatus.Released)
+    await setupDeliverableForPhase(project.id, ProjectPhase.Planning, DeliverableStatus.Draft)
+
+    const result = await advancePhase(project.id)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.reason).toBe('blocked')
+      expect(result.issues.length).toBeGreaterThan(0)
+      expect(result.message).toContain('尚未 Released')
+    }
+  })
+
+  it('soft gate 提供 override 時可繼續推進，並建立 PhaseTransition 審計記錄', async () => {
+    const project = await setupProjectWithPhase(ProjectPhase.Planning)
+    await setupDeliverableForPhase(project.id, ProjectPhase.Planning, DeliverableStatus.Draft)
+
+    const result = await advancePhase(project.id, {
+      overriddenById: testUserId,
+      rationale: 'Due to schedule pressure',
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.project.currentPhase).toBe(ProjectPhase.DesignInput)
+      expect(result.wasOverridden).toBe(true)
+    }
+
+    const transitions = await prisma.phaseTransition.findMany({
+      where: { projectId: project.id },
+    })
+    expect(transitions).toHaveLength(1)
+    expect(transitions[0].wasOverride).toBe(true)
+    expect(transitions[0].overrideReason).toBe('Due to schedule pressure')
+  })
+})
+
+// ─── Tests: DesignTransfer Hard Gate ─────────────────────────────────────────
+
+describe('DesignTransfer hard gate', () => {
+  it('所有 deliverables 都是 Released 時，可以推進到 DesignTransfer', async () => {
+    const project = await setupProjectWithPhase(ProjectPhase.Validation)
+    await setupDeliverableForPhase(project.id, ProjectPhase.Validation, DeliverableStatus.Released)
+
+    const result = await advancePhase(project.id)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.project.currentPhase).toBe(ProjectPhase.DesignTransfer)
+    }
+  })
+
+  it('有 incomplete deliverables 時，DesignTransfer 回傳 hard_gate 且不接受 override', async () => {
+    const project = await setupProjectWithPhase(ProjectPhase.Validation)
+    await setupDeliverableForPhase(project.id, ProjectPhase.Validation, DeliverableStatus.Released)
+    await setupDeliverableForPhase(project.id, ProjectPhase.Validation, DeliverableStatus.Draft)
+
+    const result = await advancePhase(project.id, {
+      overriddenById: testUserId,
+      rationale: 'Should not work',
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.reason).toBe('hard_gate')
+      expect(result.message).toContain('不接受 Override')
+    }
+  })
+
+  it('soft gate 只檢查當前 phase 的 deliverables，不受前期 phase 影響', async () => {
+    const project = await setupProjectWithPhase(ProjectPhase.Verification)
+    // Verification phase deliverable is fine
+    await setupDeliverableForPhase(project.id, ProjectPhase.Verification, DeliverableStatus.Released)
+    // Prior phase has a Draft — should NOT affect soft gate
+    await setupDeliverableForPhase(project.id, ProjectPhase.DesignOutput, DeliverableStatus.Draft)
+
+    const result = await advancePhase(project.id)
+
+    // Soft gate passes since only current phase deliverables are checked
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.project.currentPhase).toBe(ProjectPhase.Validation)
+    }
   })
 })

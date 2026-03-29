@@ -61,6 +61,7 @@ model User {
   uploadedRevisions   FileRevision[]           @relation("RevisionUploader")
   requestedChanges    ChangeRequest[]          @relation("ChangeRequester")
   approvedChanges     ChangeRequest[]          @relation("ChangeApprover")
+  triggeredPhaseTransitions PhaseTransition[] @relation("PhaseTransitionTriggeredBy")
 }
 
 model Project {
@@ -69,6 +70,7 @@ model Project {
   name           String
   description    String?
   currentPhase   ProjectPhase             @default(Concept)
+  previousPhase  ProjectPhase?
   ownerId        String?
   createdAt      DateTime                 @default(now())
   updatedAt      DateTime                 @updatedAt
@@ -76,9 +78,26 @@ model Project {
   tasks          Task[]
   deliverables   DeliverablePlaceholder[]
   changeRequests ChangeRequest[]
+  phaseTransitions PhaseTransition[]
 
   @@index([currentPhase])
   @@index([ownerId])
+}
+
+model PhaseTransition {
+  id              String      @id @default(cuid())
+  projectId       String
+  fromPhase       ProjectPhase
+  toPhase         ProjectPhase
+  triggeredById   String?
+  triggeredBy     User?       @relation("PhaseTransitionTriggeredBy", fields: [triggeredById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  wasOverride     Boolean     @default(false)
+  overrideReason  String?
+  createdAt       DateTime    @default(now())
+  project         Project     @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([projectId])
+  @@index([triggeredById])
 }
 
 model DeliverablePlaceholder {

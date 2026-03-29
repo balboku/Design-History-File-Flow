@@ -5,5 +5,11 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     setupFiles: [],
+    pool: 'threads',
+    poolOptions: {
+      threads: {
+        singleThread: true,
+      },
+    },
   },
 })
