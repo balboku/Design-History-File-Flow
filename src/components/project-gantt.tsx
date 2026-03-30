@@ -4,7 +4,12 @@ import React, { useState } from 'react'
 import { Gantt, Task as GanttTask, ViewMode } from 'gantt-task-react'
 import 'gantt-task-react/dist/index.css'
 
-export function ProjectGantt({ tasks }: { tasks: any[] }) {
+interface ProjectGanttProps {
+  tasks: any[]
+  onTaskClick?: (taskId: string) => void
+}
+
+export function ProjectGantt({ tasks, onTaskClick }: ProjectGanttProps) {
   const [view, setView] = useState<ViewMode>(ViewMode.Day)
 
   if (!tasks || tasks.length === 0) {
@@ -75,6 +80,12 @@ export function ProjectGantt({ tasks }: { tasks: any[] }) {
           locale="zh-TW"
           listCellWidth=""
           ganttHeight={transformedTasks.length > 2 ? undefined : 150}
+          onClick={(task: GanttTask) => {
+            // 忽略 buffer 任務
+            if (task.id !== 'buffer_end' && onTaskClick) {
+              onTaskClick(task.id as string)
+            }
+          }}
         />
       </div>
     </div>

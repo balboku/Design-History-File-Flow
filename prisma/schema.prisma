@@ -71,6 +71,7 @@ model User {
   ownedProjects             Project[]                @relation("ProjectOwner")
   qaOwnedDeliverables       DeliverablePlaceholder[] @relation("DeliverableOwner")
   uploadedRevisions         FileRevision[]           @relation("RevisionUploader")
+  uploadedAttachments       Attachment[]             @relation("AttachmentUploader")
   requestedChanges          ChangeRequest[]          @relation("ChangeRequester")
   approvedChanges           ChangeRequest[]          @relation("ChangeApprover")
   triggeredPhaseTransitions PhaseTransition[]        @relation("PhaseTransitionTriggeredBy")
@@ -198,6 +199,7 @@ model Task {
   assignee         User?             @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   createdBy        User?             @relation("TaskCreator", fields: [createdById], references: [id], onDelete: SetNull, onUpdate: Cascade)
   deliverableLinks TaskDeliverable[]
+  attachments      Attachment[]
 
   @@unique([projectId, code])
   @@index([projectId, plannedPhase, status])
@@ -357,4 +359,22 @@ model AuditLog {
   @@index([actorId])
   @@index([createdAt])
   @@index([action])
+}
+
+/// Reference attachments for tasks (non-compliance files)
+model Attachment {
+  id            String   @id @default(cuid())
+  taskId        String
+  fileName      String
+  storagePath   String
+  mimeType      String?
+  fileSizeBytes Int?
+  uploadedById  String?
+  createdAt     DateTime @default(now())
+  task           Task    @relation(fields: [taskId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  uploader      User?    @relation("AttachmentUploader", fields: [uploadedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([taskId])
+  @@index([uploadedById])
+  @@index([createdAt])
 }

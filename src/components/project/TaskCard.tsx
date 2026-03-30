@@ -25,6 +25,10 @@ export interface KanbanTask {
       fileRevisions: { id: string }[]
     }
   }[]
+  attachments?: {
+    id: string
+    fileName: string
+  }[]
 }
 
 interface Props {
@@ -55,6 +59,20 @@ export function TaskCard({ task, isDragOverlay = false, onFileDrop, onClick }: P
   )
   const allFilesUploaded = task.deliverableLinks.length > 0 && missingFiles.length === 0
   const uploadedCount = task.deliverableLinks.length - missingFiles.length
+
+  // 计算任务进度百分比
+  const getProgressPercentage = (): number => {
+    if (task.status === 'Done') return 100
+    if (task.status === 'InProgress') {
+      // 基于文件上传进度计算
+      const fileProgress = uploadedCount / task.deliverableLinks.length * 100
+      return Math.round(Math.min(fileProgress, 99)) // 最多99%，直到标记完成
+    }
+    return 0
+  }
+
+  const progressPercentage = getProgressPercentage()
+  const attachmentCount = task.attachments?.length ?? 0
 
   return (
     <div
@@ -136,7 +154,21 @@ export function TaskCard({ task, isDragOverlay = false, onFileDrop, onClick }: P
 
       {/* Deliverable progress dots */}
       {task.deliverableLinks.length > 0 && (
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-3 flex flex-col gap-2">
+          {/* Progress Bar */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-blue-400 to-emerald-400 transition-all duration-300"
+                style={{ width: `${progressPercentage}%` }}
+              />
+            </div>
+            <span className="text-[10px] font-bold text-slate-400 min-w-10 text-right">
+              {progressPercentage}%
+            </span>
+          </div>
+
+          {/* File Status */}
           <div className="flex items-center gap-1">
             {task.deliverableLinks.map((l) => (
               <span
@@ -153,7 +185,7 @@ export function TaskCard({ task, isDragOverlay = false, onFileDrop, onClick }: P
           <span className={`text-[11px] font-bold ${
             allFilesUploaded ? 'text-emerald-600' : 'text-slate-400'
           }`}>
-            {uploadedCount}/{task.deliverableLinks.length} 份文件已上傳
+            {uploadedCount}/{task.deliverableLinks.length} 合規文件 {attachmentCount > 0 && `· ${attachmentCount} 參考附件`}
             {allFilesUploaded && task.status === 'InProgress' && ' · 可結案'}
           </span>
         </div>

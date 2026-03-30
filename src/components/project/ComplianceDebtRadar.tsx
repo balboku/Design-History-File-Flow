@@ -16,10 +16,23 @@ interface PendingItem {
   status: string
 }
 
+interface Task {
+  id: string
+  status: string
+  assigneeId?: string | null
+}
+
+interface User {
+  id: string
+  name: string
+}
+
 interface Props {
   deliverables: Deliverable[]
   pendingItems: PendingItem[]
   currentPhase: ProjectPhase
+  tasks?: Task[]
+  users?: User[]
 }
 
 interface RadarDimension {
@@ -29,7 +42,7 @@ interface RadarDimension {
   tone: 'green' | 'amber' | 'red' | 'slate'
 }
 
-export function ComplianceDebtRadar({ deliverables, pendingItems, currentPhase }: Props) {
+export function ComplianceDebtRadar({ deliverables, pendingItems, currentPhase, tasks = [], users = [] }: Props) {
   const now = new Date()
   const openPending = pendingItems.filter((i) => i.status === 'Open').length
   const requiredDeliverables = deliverables.filter((d) => d.isRequired !== false)
@@ -43,10 +56,24 @@ export function ComplianceDebtRadar({ deliverables, pendingItems, currentPhase }
   const nearDesignTransfer =
     PHASE_ORDER.indexOf(currentPhase) >= PHASE_ORDER.indexOf(ProjectPhase.Validation)
 
+  // ── Workload Analysis ────────────────────────────────────────────────────────
+  const inProgressTasks = tasks.filter((t) => t.status === 'InProgress')
+  const workloadByUser: Record<string, number> = {}
+  inProgressTasks.forEach((task) => {
+    if (task.assigneeId) {
+      workloadByUser[task.assigneeId] = (workloadByUser[task.assigneeId] || 0) + 1
+    }
+  })
+
+  const overloadedUsers = Object.entries(workloadByUser).filter(([_, count]) => count > 5)
+  const maxWorkload = Math.max(...Object.values(workloadByUser), 0)
+  const overloadPct = maxWorkload > 0 ? Math.min((overloadedUsers.length / users.length) * 100, 100) : 0
+  const workloadStatus = overloadedUsers.length > 0 ? '高負載' : maxWorkload > 3 ? '中等' : '正常'
+
   // ── Risk level ──────────────────────────────────────────────────────────────
-  const isHighRisk = openPending > 5 || overdueRequired > 0
+  const isHighRisk = openPending > 5 || overdueRequired > 0 || overloadedUsers.length > 0
   const isMedRisk =
-    !isHighRisk && (openPending > 2 || docCompletionPct < 70)
+    !isHighRisk && (openPending > 2 || docCompletionPct < 70 || maxWorkload > 3)
   const isDesignTransferBlocked = nearDesignTransfer && openPending > 0
 
   const riskLabel = isHighRisk
@@ -77,6 +104,12 @@ export function ComplianceDebtRadar({ deliverables, pendingItems, currentPhase }
       value: Math.max(0, 100 - overdueRequired * 25),
       count: `${overdueRequired} 份逾期`,
       tone: overdueRequired === 0 ? 'green' : overdueRequired === 1 ? 'amber' : 'red',
+    },
+    {
+      label: '人力負載',
+      value: Math.max(0, 100 - overloadedUsers.length * 20),
+      count: overloadedUsers.length > 0 ? `${overloadedUsers.length} 人超負載` : '正常',
+      tone: overloadedUsers.length > 0 ? 'red' : maxWorkload > 3 ? 'amber' : 'green',
     },
     {
       label: '關卡通過準備度',
@@ -114,7 +147,12 @@ export function ComplianceDebtRadar({ deliverables, pendingItems, currentPhase }
             ⚠ 硬關卡阻擋預警：DesignTransfer 將近，尚有 {openPending} 項未結遺留項
           </span>
         )}
-        {isHighRisk && !isDesignTransferBlocked && (
+        {overloadedUsers.length > 0 && !isDesignTransferBlocked && (
+          <span className="rounded-full bg-red-100 px-3 py-1 text-[12px] font-bold text-red-700 ring-1 ring-red-200">
+            ⚠ 人力超負載：{overloadedUsers.length} 位成員進行中任務超過 5 項
+          </span>
+        )}
+        {isHighRisk && !isDesignTransferBlocked && overloadedUsers.length === 0 && (
           <span className="rounded-full bg-red-100 px-3 py-1 text-[12px] font-bold text-red-700 ring-1 ring-red-200">
             ⚠ 高風險：請儘速處理遺留項與逾期文件
           </span>

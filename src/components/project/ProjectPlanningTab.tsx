@@ -9,7 +9,7 @@ import { ProjectGantt } from '@/components/project-gantt'
 import { KanbanBoard } from '@/components/project/KanbanBoard'
 import type { KanbanTask } from '@/components/project/TaskCard'
 import { PHASE_ORDER } from '@/lib/phase-service'
-import { createTaskAction } from '@/actions/task-actions'
+import { createTaskAction, updateTaskAction } from '@/actions/task-actions'
 import { createDeliverableAction } from '@/actions/deliverable-actions'
 import { formatProjectPhase, formatDateShort } from '@/lib/ui-labels'
 
@@ -66,6 +66,7 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
   const router = useRouter()
   const [taskDialogOpen, setTaskDialogOpen] = useState(false)
   const [deliverableDialogOpen, setDeliverableDialogOpen] = useState(false)
+  const [selectedTaskForEdit, setSelectedTaskForEdit] = useState<Task | null>(null)
 
   const rdUsers = lookupUsers.filter((u) => u.role === Role.RD)
   const qaUsers = lookupUsers.filter((u) => u.role === Role.QA || u.role === Role.ADMIN)
@@ -111,9 +112,15 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
       {/* Gantt */}
       <SectionCard
         title="專案甘特圖"
-        subtitle="視覺化檢視開發任務的排程與進度狀態。"
+        subtitle="視覺化檢視開發任務的排程與進度狀態。點擊任務條可編輯詳細資訊。"
       >
-        <ProjectGantt tasks={project.tasks} />
+        <ProjectGantt
+          tasks={project.tasks}
+          onTaskClick={(taskId) => {
+            const task = project.tasks.find((t) => t.id === taskId)
+            if (task) setSelectedTaskForEdit(task as Task)
+          }}
+        />
       </SectionCard>
 
       {/* Kanban Board */}
@@ -365,6 +372,146 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
               >
                 建立文件空殼
               </button>
+            </form>
+          </div>
+        </dialog>
+      )}
+
+      {/* ─── Edit Task Dialog (from Gantt or Kanban) ─────────────────────────── */}
+      {selectedTaskForEdit && (
+        <dialog
+          open
+          className="fixed inset-0 z-[90] flex h-full w-full items-center justify-center m-0 bg-slate-900/40 p-4 backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedTaskForEdit(null)
+          }}
+        >
+          <div className="w-full max-w-[500px] rounded-[20px] bg-white p-6 shadow-2xl ring-1 ring-black/5">
+            <h2 className="m-0 text-[18px] font-bold text-slate-800 mb-4">編輯任務 · {selectedTaskForEdit.code}</h2>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault()
+                const formData = new FormData(e.currentTarget)
+                const title = formData.get('title') as string
+                const description = formData.get('description') as string | null
+                const assigneeId = formData.get('assigneeId') as string | null
+                const plannedStartDate = formData.get('plannedStartDate') as string | null
+                const targetDate = formData.get('targetDate') as string | null
+
+                const res = await updateTaskAction({
+                  taskId: selectedTaskForEdit.id,
+                  title: title || undefined,
+                  description: description || null,
+                  assigneeId: assigneeId || null,
+                  plannedStartDate: plannedStartDate || null,
+                  targetDate: targetDate || null,
+                })
+
+                if (res.success) {
+                  setSelectedTaskForEdit(null)
+                  router.refresh()
+                }
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label htmlFor="title" className="block text-[12px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  標題
+                </label>
+                <input
+                  id="title"
+                  type="text"
+                  name="title"
+                  defaultValue={selectedTaskForEdit.title}
+                  required
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[14px] text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="description" className="block text-[12px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  描述
+                </label>
+                <textarea
+                  id="description"
+                  name="description"
+                  defaultValue={selectedTaskForEdit.description || ''}
+                  rows={3}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[14px] text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none resize-none"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="assigneeId" className="block text-[12px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  負責人
+                </label>
+                <select
+                  id="assigneeId"
+                  name="assigneeId"
+                  defaultValue={selectedTaskForEdit.assigneeId || ''}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[14px] text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none"
+                >
+                  <option value="">未指派</option>
+                  {rdUsers.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="plannedStartDate" className="block text-[12px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    預計開始
+                  </label>
+                  <input
+                    id="plannedStartDate"
+                    type="date"
+                    name="plannedStartDate"
+                    defaultValue={
+                      selectedTaskForEdit.plannedStartDate
+                        ? new Date(selectedTaskForEdit.plannedStartDate).toISOString().split('T')[0]
+                        : ''
+                    }
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[14px] text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="targetDate" className="block text-[12px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    目標完成
+                  </label>
+                  <input
+                    id="targetDate"
+                    type="date"
+                    name="targetDate"
+                    defaultValue={
+                      selectedTaskForEdit.targetDate
+                        ? new Date(selectedTaskForEdit.targetDate).toISOString().split('T')[0]
+                        : ''
+                    }
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[14px] text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedTaskForEdit(null)}
+                  className="rounded-lg px-4 py-2 text-[13px] font-bold text-slate-600 hover:bg-slate-100"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-blue-500 px-4 py-2 text-[13px] font-bold text-white hover:bg-blue-600"
+                >
+                  保存
+                </button>
+              </div>
             </form>
           </div>
         </dialog>

@@ -229,6 +229,13 @@ export async function getProjectDetail(projectId: string) {
               },
             },
           },
+          attachments: {
+            select: {
+              id: true,
+              fileName: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          },
         },
         orderBy: [{ plannedPhase: 'asc' }, { createdAt: 'desc' }],
       },
@@ -320,6 +327,15 @@ export async function getProjectDetail(projectId: string) {
           },
         },
         orderBy: { createdAt: 'desc' },
+      },
+      auditLogs: {
+        include: {
+          actor: {
+            select: { name: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
       },
     },
   })

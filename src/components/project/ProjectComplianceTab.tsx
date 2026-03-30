@@ -62,7 +62,10 @@ function formatFileSize(value: number | null) {
 }
 
 export function ProjectComplianceTab({ project, lookupUsers }: Props) {
+  const router = useRouter()
+  const currentUserRole = lookupUsers[0]?.role // 現實中應從 session 獲取
   const qaUsers = lookupUsers.filter((u) => u.role === Role.QA || u.role === Role.ADMIN)
+  const canRelease = currentUserRole === Role.QA || currentUserRole === Role.ADMIN
 
   return (
     <div className="flex flex-col gap-6 lg:grid lg:grid-cols-12 lg:gap-6">
@@ -437,7 +440,13 @@ function DeliverableCard({
                       type="submit"
                       name="status"
                       value={DeliverableStatus.Released}
-                      className="w-full rounded-xl bg-slate-800 px-5 py-3.5 text-[15px] font-bold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-slate-700 focus:outline-none"
+                      disabled={!canRelease}
+                      title={!canRelease ? '只有 QA 或 ADMIN 角色可以釋出文件' : '簽署並正式釋出'}
+                      className={`w-full rounded-xl px-5 py-3.5 text-[15px] font-bold shadow-md transition-all focus:outline-none ${
+                        canRelease
+                          ? 'bg-slate-800 text-white hover:-translate-y-0.5 hover:bg-slate-700'
+                          : 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-50'
+                      }`}
                     >
                       簽署並正式釋出 (Release)
                     </button>

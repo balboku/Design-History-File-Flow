@@ -14,6 +14,7 @@ import {
 import { Role } from '@prisma/client'
 import { useRouter } from 'next/navigation'
 import { startTaskAction, completeTaskAction, updateTaskAction } from '@/actions/task-actions'
+import { createAttachmentAction, getTaskAttachmentsAction, deleteAttachmentAction } from '@/actions/attachment-actions'
 import { TaskCard, type KanbanTask } from './TaskCard'
 import { KanbanColumn } from './KanbanColumn'
 import { QuickUploadModal } from './QuickUploadModal'
@@ -30,11 +31,68 @@ interface TaskEditDialogProps {
 function TaskEditDialog({ task, lookupUsers, onClose, onSaveSuccess }: TaskEditDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isUploadingFile, setIsUploadingFile] = useState(false)
+  const [dragActive, setDragActive] = useState(false)
+  const [attachments, setAttachments] = useState<Array<{ id: string; fileName: string }>>(task.attachments || [])
   const router = useRouter()
 
-  // Get current actor ID from session (would need to be passed from parent in real app)
-  // For now, we'll get the first RD user as a placeholder
   const currentUserId = lookupUsers.find((u) => u.role === 'RD')?.id || ''
+
+  const handleFileUpload = async (files: FileList) => {
+    if (files.length === 0) return
+    const file = files[0]
+
+    setIsUploadingFile(true)
+    setError(null)
+
+    try {
+      // 这是一个模拟实现，实际需要配置上传端点
+      // 在生产环境中应该调用真实的上传 API
+      const reader = new FileReader()
+      reader.onload = async () => {
+        // 这里应该与后端 API 通信进行實際上傳
+        // 暂时模拟成功
+        const newAttachment = {
+          id: 'temp-' + Date.now(),
+          fileName: file.name,
+        }
+        setAttachments([newAttachment, ...attachments])
+      }
+      reader.readAsArrayBuffer(file)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'File upload failed'
+      setError(message)
+    } finally {
+      setIsUploadingFile(false)
+    }
+  }
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true)
+    } else if (e.type === 'dragleave') {
+      setDragActive(false)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragActive(false)
+    handleFileUpload(e.dataTransfer.files)
+  }
+
+  const handleRemoveAttachment = async (attachmentId: string) => {
+    // 移除本地显示
+    setAttachments(attachments.filter(a => a.id !== attachmentId))
+
+    // 如果是真实附件ID（不以 temp- 开头），则调用删除 API
+    if (!attachmentId.startsWith('temp-')) {
+      await deleteAttachmentAction(attachmentId, currentUserId)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -72,7 +130,6 @@ function TaskEditDialog({ task, lookupUsers, onClose, onSaveSuccess }: TaskEditD
     }
   }
 
-  // Format date for input (YYYY-MM-DD)
   const formatDateForInput = (date: Date | string | null | undefined): string => {
     if (!date) return ''
     const d = new Date(date)
@@ -185,6 +242,79 @@ function TaskEditDialog({ task, lookupUsers, onClose, onSaveSuccess }: TaskEditD
               defaultValue={formatDateForInput(task.targetDate)}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[14px] text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none"
             />
+          </div>
+
+          {/* Attachments Upload Area */}
+          <div>
+            <label className="block text-[12px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+              參考附件（可選）
+            </label>
+            <div
+              onDragEnter={handleDrag}
+              onDragLeave={handleDrag}
+              onDragOver={handleDrag}
+              onDrop={handleDrop}
+              className={`relative border-2 border-dashed rounded-xl p-4 transition-all ${
+                dragActive
+                  ? 'border-blue-400 bg-blue-50'
+                  : 'border-slate-200 bg-slate-50/50 hover:border-slate-300'
+              }`}
+            >
+              <input
+                type="file"
+                id="attachment-input"
+                onChange={(e) => handleFileUpload(e.currentTarget.files || new FileList())}
+                className="hidden"
+                disabled={isUploadingFile}
+              />
+              <label
+                htmlFor="attachment-input"
+                className="flex flex-col items-center gap-2 cursor-pointer"
+              >
+                <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                <span className="text-[12px] font-bold text-slate-600">
+                  {isUploadingFile ? '上傳中...' : '拖放檔案或點擊選擇'}
+                </span>
+              </label>
+            </div>
+
+            {/* Attachments List */}
+            {attachments.length > 0 && (
+              <div className="mt-2 flex flex-col gap-1.5">
+                {attachments.map((att) => (
+                  <div
+                    key={att.id}
+                    className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-[12px]"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <svg className="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                      <span className="truncate text-slate-700 font-medium">{att.fileName}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveAttachment(att.id)}
+                      className="shrink-0 text-slate-400 hover:text-red-600 transition-colors"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Buttons */}

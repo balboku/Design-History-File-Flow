@@ -10,6 +10,7 @@ import {
 import { ProjectPlanningTab } from '@/components/project/ProjectPlanningTab'
 import { ProjectDashboardTab } from '@/components/project/ProjectDashboardTab'
 import { ProjectComplianceTab } from '@/components/project/ProjectComplianceTab'
+import { ActivityLogTab } from '@/components/project/ActivityLogTab'
 import { getProjectDetail, getWorkspaceLookupData } from '@/lib/frontend-data'
 
 type Params = Promise<{ projectId: string }>
@@ -59,6 +60,7 @@ export default async function ProjectDetailPage({
     { id: 'planning', label: '規劃', href: buildUrl(projectId, { tab: 'planning' }) },
     { id: 'dashboard', label: '執行監控', href: buildUrl(projectId, { tab: 'dashboard' }) },
     { id: 'compliance', label: 'DHF 合規文件', href: buildUrl(projectId, { tab: 'compliance' }) },
+    { id: 'activity', label: '活動紀錄', href: buildUrl(projectId, { tab: 'activity' }) },
   ]
 
   return (
@@ -153,6 +155,12 @@ export default async function ProjectDetailPage({
         <ProjectComplianceTab
           project={project}
           lookupUsers={lookup.users}
+        />
+      )}
+
+      {activeTab === 'activity' && (
+        <ActivityLogTab
+          auditLogs={project.auditLogs || []}
         />
       )}
     </AppShell>
