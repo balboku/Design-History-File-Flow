@@ -13,6 +13,8 @@ export interface KanbanTask {
   description?: string | null
   status: string
   plannedPhase: ProjectPhase
+  assigneeId?: string | null
+  plannedStartDate?: Date | string | null
   targetDate?: Date | string | null
   assignee?: { name?: string } | null
   deliverableLinks: {
@@ -29,9 +31,10 @@ interface Props {
   task: KanbanTask
   isDragOverlay?: boolean
   onFileDrop?: (taskId: string, files: FileList) => void
+  onClick?: (task: KanbanTask) => void
 }
 
-export function TaskCard({ task, isDragOverlay = false, onFileDrop }: Props) {
+export function TaskCard({ task, isDragOverlay = false, onFileDrop, onClick }: Props) {
   const [isGhostHover, setIsGhostHover] = useState(false)
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
@@ -59,6 +62,7 @@ export function TaskCard({ task, isDragOverlay = false, onFileDrop }: Props) {
       style={style}
       {...listeners}
       {...attributes}
+      onClick={() => onClick?.(task)}
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes('Files')) {
           e.preventDefault()

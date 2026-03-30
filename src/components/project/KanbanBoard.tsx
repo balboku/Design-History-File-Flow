@@ -13,10 +13,203 @@ import {
 } from '@dnd-kit/core'
 import { Role } from '@prisma/client'
 import { useRouter } from 'next/navigation'
-import { startTaskAction, completeTaskAction } from '@/actions/task-actions'
+import { startTaskAction, completeTaskAction, updateTaskAction } from '@/actions/task-actions'
 import { TaskCard, type KanbanTask } from './TaskCard'
 import { KanbanColumn } from './KanbanColumn'
 import { QuickUploadModal } from './QuickUploadModal'
+
+// ─── Task Edit Dialog Component ────────────────────────────────────────────
+
+interface TaskEditDialogProps {
+  task: KanbanTask
+  lookupUsers: { id: string; name: string; role: Role }[]
+  onClose: () => void
+  onSaveSuccess: () => void
+}
+
+function TaskEditDialog({ task, lookupUsers, onClose, onSaveSuccess }: TaskEditDialogProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
+
+  // Get current actor ID from session (would need to be passed from parent in real app)
+  // For now, we'll get the first RD user as a placeholder
+  const currentUserId = lookupUsers.find((u) => u.role === 'RD')?.id || ''
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setError(null)
+    setIsSubmitting(true)
+
+    const formData = new FormData(e.currentTarget)
+    const title = formData.get('title') as string
+    const description = formData.get('description') as string | null
+    const assigneeId = formData.get('assigneeId') as string | null
+    const plannedStartDate = formData.get('plannedStartDate') as string | null
+    const targetDate = formData.get('targetDate') as string | null
+
+    try {
+      const result = await updateTaskAction({
+        taskId: task.id,
+        title: title || undefined,
+        description: description || null,
+        assigneeId: assigneeId || null,
+        plannedStartDate: plannedStartDate || null,
+        targetDate: targetDate || null,
+        actorId: currentUserId || undefined,
+      })
+
+      if (result.success) {
+        onSaveSuccess()
+      } else {
+        setError(result.error)
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setError(message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Format date for input (YYYY-MM-DD)
+  const formatDateForInput = (date: Date | string | null | undefined): string => {
+    if (!date) return ''
+    const d = new Date(date)
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  const rdUsers = lookupUsers.filter((u) => u.role === 'RD')
+
+  return (
+    <dialog
+      open
+      className="fixed inset-0 z-[80] flex h-full w-full items-center justify-center m-0 bg-slate-900/40 p-4 backdrop-blur-sm"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div className="w-full max-w-[500px] rounded-[20px] bg-white p-6 shadow-2xl ring-1 ring-black/5">
+        <h2 className="m-0 text-[18px] font-bold text-slate-800 mb-4">編輯任務 · {task.code}</h2>
+
+        {error && (
+          <div className="mb-4 flex items-center gap-2.5 rounded-lg bg-red-50 px-3.5 py-3 text-[13px] font-bold text-red-700">
+            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Title */}
+          <div>
+            <label htmlFor="title" className="block text-[12px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+              標題
+            </label>
+            <input
+              id="title"
+              type="text"
+              name="title"
+              defaultValue={task.title}
+              required
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[14px] text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none"
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label htmlFor="description" className="block text-[12px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+              描述
+            </label>
+            <textarea
+              id="description"
+              name="description"
+              defaultValue={task.description || ''}
+              rows={3}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[14px] text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none resize-none"
+            />
+          </div>
+
+          {/* Assignee */}
+          <div>
+            <label htmlFor="assigneeId" className="block text-[12px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+              負責人
+            </label>
+            <select
+              id="assigneeId"
+              name="assigneeId"
+              defaultValue={task.assigneeId || ''}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[14px] text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none"
+            >
+              <option value="">未指派</option>
+              {rdUsers.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Planned Start Date */}
+          <div>
+            <label htmlFor="plannedStartDate" className="block text-[12px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+              預計開始日期
+            </label>
+            <input
+              id="plannedStartDate"
+              type="date"
+              name="plannedStartDate"
+              defaultValue={formatDateForInput(task.plannedStartDate)}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[14px] text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none"
+            />
+          </div>
+
+          {/* Target Date (Completion Date) */}
+          <div>
+            <label htmlFor="targetDate" className="block text-[12px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+              目標完成日期
+            </label>
+            <input
+              id="targetDate"
+              type="date"
+              name="targetDate"
+              defaultValue={formatDateForInput(task.targetDate)}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[14px] text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none"
+            />
+          </div>
+
+          {/* Buttons */}
+          <div className="flex justify-end gap-2.5 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="rounded-lg px-4 py-2 text-[13px] font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="rounded-lg bg-blue-500 px-4 py-2 text-[13px] font-bold text-white hover:bg-blue-600 disabled:opacity-50"
+            >
+              {isSubmitting ? '保存中...' : '保存'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+  )
+}
 
 type ColumnId = 'Todo' | 'InProgress' | 'Done'
 const COLUMNS: ColumnId[] = ['Todo', 'InProgress', 'Done']
@@ -30,6 +223,7 @@ interface Props {
 export function KanbanBoard({ projectId, tasks, lookupUsers }: Props) {
   const router = useRouter()
   const [activeTask, setActiveTask] = useState<KanbanTask | null>(null)
+  const [editingTask, setEditingTask] = useState<KanbanTask | null>(null)
   const [overColumn, setOverColumn] = useState<ColumnId | null>(null)
   // Optimistic task statuses: taskId → status
   const [optimisticStatus, setOptimisticStatus] = useState<Record<string, string>>({})
@@ -248,7 +442,7 @@ export function KanbanBoard({ projectId, tasks, lookupUsers }: Props) {
               isOver={overColumn === col}
             >
               {tasksByColumn[col].map((task) => (
-                <TaskCard key={task.id} task={task} onFileDrop={handleGhostFileDrop} />
+                <TaskCard key={task.id} task={task} onFileDrop={handleGhostFileDrop} onClick={(t) => setEditingTask(t)} />
               ))}
               {tasksByColumn[col].length === 0 && (
                 <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-200 py-8 text-[13px] font-medium text-slate-400">
@@ -263,6 +457,19 @@ export function KanbanBoard({ projectId, tasks, lookupUsers }: Props) {
           {activeTask ? <TaskCard task={activeTask} isDragOverlay /> : null}
         </DragOverlay>
       </DndContext>
+
+      {/* Task Edit Dialog */}
+      {editingTask && (
+        <TaskEditDialog
+          task={editingTask}
+          lookupUsers={lookupUsers}
+          onClose={() => setEditingTask(null)}
+          onSaveSuccess={() => {
+            setEditingTask(null)
+            router.refresh()
+          }}
+        />
+      )}
 
       {/* Ghost Drop Uploader Modal */}
       {ghostUpload && (

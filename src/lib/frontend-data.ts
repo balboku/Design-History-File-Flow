@@ -199,9 +199,18 @@ export async function getProjectDetail(projectId: string) {
         select: { id: true, name: true, role: true },
       },
       tasks: {
-        include: {
+        select: {
+          id: true,
+          code: true,
+          title: true,
+          description: true,
+          status: true,
+          plannedPhase: true,
+          assigneeId: true,
+          plannedStartDate: true,
+          targetDate: true,
           assignee: {
-            select: { name: true },
+            select: { id: true, name: true },
           },
           deliverableLinks: {
             include: {

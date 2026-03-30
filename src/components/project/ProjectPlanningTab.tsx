@@ -26,6 +26,7 @@ interface Task {
   description?: string | null
   status: string
   plannedPhase: ProjectPhase
+  assigneeId?: string | null
   plannedStartDate?: Date | string | null
   targetDate?: Date | string | null
   assignee?: { name?: string } | null

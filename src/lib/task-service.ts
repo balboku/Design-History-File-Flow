@@ -42,6 +42,27 @@ export interface StartTaskResult {
   }
 }
 
+export interface UpdateTaskInput {
+  taskId: string
+  title?: string
+  description?: string | null
+  assigneeId?: string | null
+  plannedStartDate?: Date | null
+  targetDate?: Date | null
+  actorId?: string | null
+}
+
+export interface UpdateTaskResult {
+  task: {
+    id: string
+    title: string
+    description: string | null
+    assigneeId: string | null
+    plannedStartDate: Date | null
+    targetDate: Date | null
+  }
+}
+
 /**
  * 建立 Task 並同時綁定多個 DeliverablePlaceholder。
  * 根據 CLAUDE.md 的 Business Rule：Task 不能存在沒有 deliverable placeholder 的情況。
@@ -236,5 +257,78 @@ export async function completeTask(taskId: string): Promise<CompleteTaskResult> 
       status: updated.status,
       completedAt: updated.completedAt,
     },
+  }
+}
+
+/**
+ * 更新 Task 的欄位（標題、描述、負責人、計畫日期等）。
+ * 記錄修改稽核軌跡。
+ */
+export async function updateTask(input: UpdateTaskInput): Promise<UpdateTaskResult> {
+  const { taskId, actorId, ...updateData } = input
+
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      assigneeId: true,
+      plannedStartDate: true,
+      targetDate: true,
+    },
+  })
+
+  if (!task) {
+    throw new Error(`Task not found: ${taskId}`)
+  }
+
+  // 只更新傳入的欄位
+  const dataToUpdate: Record<string, unknown> = {}
+  if (updateData.title !== undefined) dataToUpdate.title = updateData.title
+  if (updateData.description !== undefined) dataToUpdate.description = updateData.description
+  if (updateData.assigneeId !== undefined) dataToUpdate.assigneeId = updateData.assigneeId
+  if (updateData.plannedStartDate !== undefined) dataToUpdate.plannedStartDate = updateData.plannedStartDate
+  if (updateData.targetDate !== undefined) dataToUpdate.targetDate = updateData.targetDate
+
+  if (Object.keys(dataToUpdate).length === 0) {
+    // 沒有任何欄位需要更新
+    return {
+      task: {
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        assigneeId: task.assigneeId,
+        plannedStartDate: task.plannedStartDate,
+        targetDate: task.targetDate,
+      },
+    }
+  }
+
+  const updated = await prisma.task.update({
+    where: { id: taskId },
+    data: dataToUpdate,
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      assigneeId: true,
+      plannedStartDate: true,
+      targetDate: true,
+    },
+  })
+
+  await recordAudit({
+    action: AuditActions.TASK_UPDATE,
+    entityType: 'Task',
+    entityId: updated.id,
+    actorId,
+    detail: {
+      changes: dataToUpdate,
+    },
+  })
+
+  return {
+    task: updated,
   }
 }

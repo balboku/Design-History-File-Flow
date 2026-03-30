@@ -1,6 +1,6 @@
 'use server'
 
-import { createTask, startTask, completeTask, TASK_COMPLETION_ERROR, TASK_NOT_IN_PROGRESS_ERROR } from '@/lib/task-service'
+import { createTask, startTask, completeTask, updateTask, TASK_COMPLETION_ERROR, TASK_NOT_IN_PROGRESS_ERROR } from '@/lib/task-service'
 import { ProjectPhase } from '@prisma/client'
 
 // ─── Create Task ──────────────────────────────────────────────────────────────
@@ -87,5 +87,41 @@ export async function completeTaskAction(
     const isFileMissingError = message.startsWith(TASK_COMPLETION_ERROR)
     const isNotInProgressError = message === TASK_NOT_IN_PROGRESS_ERROR
     return { success: false, error: message, isFileMissingError, isNotInProgressError }
+  }
+}
+
+// ─── Update Task ──────────────────────────────────────────────────────────
+
+export interface UpdateTaskActionInput {
+  taskId: string
+  title?: string
+  description?: string | null
+  assigneeId?: string | null
+  plannedStartDate?: string | null
+  targetDate?: string | null
+  actorId?: string | null
+}
+
+export type UpdateTaskActionResult = {
+  success: true
+  data: Awaited<ReturnType<typeof updateTask>>['task']
+} | {
+  success: false
+  error: string
+}
+
+export async function updateTaskAction(
+  input: UpdateTaskActionInput
+): Promise<UpdateTaskActionResult> {
+  try {
+    const result = await updateTask({
+      ...input,
+      plannedStartDate: input.plannedStartDate ? new Date(input.plannedStartDate) : undefined,
+      targetDate: input.targetDate ? new Date(input.targetDate) : undefined,
+    })
+    return { success: true, data: result.task }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return { success: false, error: message }
   }
 }
