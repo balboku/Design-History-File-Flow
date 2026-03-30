@@ -101,6 +101,7 @@ interface Props {
 export function ProjectDashboardTab({ project, gate, lookupUsers }: Props) {
   const router = useRouter()
   const [gateDialogOpen, setGateDialogOpen] = useState(false)
+  const [gateError, setGateError] = useState<string | null>(null)
 
   const doneTasks = project.tasks.filter((t) => t.status === 'Done').length
   const atRiskTasks = project.tasks.filter(
@@ -393,8 +394,18 @@ export function ProjectDashboardTab({ project, gate, lookupUsers }: Props) {
 
             <form
               action={async (formData: FormData) => {
+                setGateError(null)
                 const forceOverride = formData.get('forceOverride') === 'true'
-                await advancePhaseAction({
+                
+                if (forceOverride) {
+                  const rationale = String(formData.get('rationale') ?? '').trim()
+                  if (!rationale) {
+                    setGateError('請填寫風險評估與承擔原因說明')
+                    return
+                  }
+                }
+                
+                const result = await advancePhaseAction({
                   projectId: project.id,
                   forceOverride,
                   triggeredById: String(formData.get('triggeredById') ?? '') || undefined,
@@ -402,14 +413,34 @@ export function ProjectDashboardTab({ project, gate, lookupUsers }: Props) {
                     ? String(formData.get('overriddenById') ?? '') || undefined
                     : undefined,
                   rationale: forceOverride
-                    ? String(formData.get('rationale') ?? '') || undefined
+                    ? String(formData.get('rationale') ?? '').trim() || undefined
                     : undefined,
                 })
-                router.refresh()
-                setGateDialogOpen(false)
+                const resultAny = result as Record<string, unknown>
+                if (resultAny.success === true) {
+                  router.refresh()
+                  setGateDialogOpen(false)
+                } else if (resultAny.success === false) {
+                  setGateError((resultAny.message as string) || '操作失敗，請稍後再試')
+                } else if (resultAny.kind === 'hard_gate') {
+                  setGateError('此為硬關卡，無法強制推進。請先完成所有必要文件。')
+                } else if (resultAny.kind === 'warning') {
+                  setGateError('請填寫風險承諾與放行資訊，或先完成必要文件。')
+                } else {
+                  setGateError('操作失敗，請稍後再試')
+                }
               }}
               className="flex flex-col gap-6"
             >
+              {gateError && (
+                <div className="flex items-center gap-2.5 rounded-lg bg-red-50 px-3.5 py-3 text-[13px] font-bold text-red-700">
+                  <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {gateError}
+                </div>
+              )}
+
               <input type="hidden" name="projectId" value={project.id} />
               {gate?.canAdvance ? null : (
                 <input type="hidden" name="forceOverride" value="true" />

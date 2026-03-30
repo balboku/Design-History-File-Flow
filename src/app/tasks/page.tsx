@@ -13,7 +13,7 @@ export default async function TasksPage() {
     >
       <SectionCard
         title="任務流"
-        subtitle="任務的規劃階段與專案當前階段會並列顯示，支援風險放行，同時不隱藏風險。"
+        subtitle="追蹤跨階段的研發任務執行狀態與文件齊全度。"
       >
         {tasks.length === 0 ? (
           <EmptyPanel title="尚未建立任務" body="可從專案詳情頁建立第一批任務，這裡就會自動匯總。" />

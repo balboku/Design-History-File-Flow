@@ -110,8 +110,27 @@ export function CreateChangeRequestForm({ action, projects, users, deliverables,
     }
   }
 
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+    
+    const cleanFormData = new Map<string, FormDataEntryValue>()
+    for (const [key, value] of formData.entries()) {
+      if (key === 'regulatoryImpact' && !impactToggles.regulatory) continue
+      if (key === 'productRiskImpact' && !impactToggles.productRisk) continue
+      if (key === 'verificationImpact' && !impactToggles.verification) continue
+      if (key === 'validationImpact' && !impactToggles.validation) continue
+      if (key === 'manufacturingImpact' && !impactToggles.manufacturing) continue
+      if (key === 'documentationImpact' && !impactToggles.documentation) continue
+      cleanFormData.set(key, value)
+    }
+    
+    const data = Object.fromEntries(cleanFormData)
+    action(data as unknown as FormData)
+  }
+
   return (
-    <form action={action} style={{ display: 'grid', gap: 10 }}>
+    <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 10 }}>
       {showChecklist && (
         <div style={{ background: 'rgba(255,160,50,0.15)', border: '1px solid rgba(255,160,50,0.3)', borderRadius: 16, padding: '16px', marginBottom: 8 }}>
           <div style={{ color: '#ffd6a5', fontSize: 13, fontWeight: 'bold', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>

@@ -127,9 +127,6 @@ export default async function PendingItemsPage({
 
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: 18,
           marginBottom: 18,
         }}
       >
@@ -137,7 +134,7 @@ export default async function PendingItemsPage({
           title="查詢條件"
           subtitle="選擇專案後，可查看該專案所有未結與歷史遺留項。"
         >
-          <form method="GET" style={{ display: 'grid', gap: 10 }}>
+          <form method="GET" style={{ display: 'grid', gap: 10, maxWidth: 600 }}>
             <select name="projectId" defaultValue={projectId} style={inputStyle}>
               <option value="">選擇專案</option>
               {projects.map((project) => (
@@ -155,24 +152,6 @@ export default async function PendingItemsPage({
               載入遺留項
             </button>
           </form>
-        </SectionCard>
-
-        <SectionCard
-          title="規則說明"
-          subtitle="軟關卡讓團隊能前進，但每個例外都必須留下可追蹤的稽核痕跡。"
-          tone="dark"
-        >
-          <div style={{ display: 'grid', gap: 12 }}>
-            <div style={darkPanelStyle}>
-              `未結案` 代表這筆條件式放行的風險仍在，綁定文件還沒有完整釋出。
-            </div>
-            <div style={darkPanelStyle}>
-              `已補齊` 代表對應文件已達 `已釋出`，遺留項可以正式結案。
-            </div>
-            <div style={darkPanelStyle}>
-              到了 `設計移轉` 這道最終硬關卡，只要還有未結遺留項，就不允許放行。
-            </div>
-          </div>
         </SectionCard>
       </div>
 

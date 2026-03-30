@@ -13,7 +13,7 @@ export default async function PhaseGatesPage() {
     >
       <SectionCard
         title="各專案關卡狀態"
-        subtitle="這張看板模擬專案經理在推進階段前需要看到的決策資訊。"
+        subtitle="各專案當前階段的推進準備度與風險評估狀態。"
       >
         {items.length === 0 ? (
           <EmptyPanel title="目前沒有可評估的專案" body="建立專案後，系統就會自動計算每個階段關卡狀態。" />

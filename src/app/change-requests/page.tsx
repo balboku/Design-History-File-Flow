@@ -154,7 +154,6 @@ export default async function ChangeRequestsPage({
       </div>
 
       <div
-        className="app-grid-2"
         style={{ marginBottom: 18 }}
       >
         <SectionCard
@@ -169,23 +168,6 @@ export default async function ChangeRequestsPage({
             deliverables={lookup.deliverables}
             parts={lookup.parts}
           />
-        </SectionCard>
-
-        <SectionCard
-          title="設計原則"
-          subtitle="變更單（Change Request）不只是表單，而是設計移轉後唯一合法的變更入口。"
-        >
-          <div style={{ display: 'grid', gap: 12 }}>
-            <div style={notePanelStyle}>
-              每張變更單可直接連結專案、單一或多個文件，或受影響料號。
-            </div>
-            <div style={notePanelStyle}>
-              影響評估會與變更單一起保存，讓審查人能理解為什麼需要升版。
-            </div>
-            <div style={notePanelStyle}>
-              後續檔案版次也可回指該變更單，補齊設計移轉後的追溯鏈。
-            </div>
-          </div>
         </SectionCard>
       </div>
 

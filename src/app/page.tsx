@@ -1,4 +1,3 @@
-import type { CSSProperties } from 'react'
 import { Role } from '@prisma/client'
 import { ActionLink, AppShell, MetricCard, SectionCard, StatusPill } from '@/components/app-shell'
 import { getAppDashboardData, getProjectSummaries, getWorkspaceLookupData } from '@/lib/frontend-data'
@@ -25,7 +24,7 @@ export default async function HomePage() {
     <AppShell
       eyebrow="醫療器材研發管理平台"
       title="讓研發偷跑有軌跡，讓合規放行有依據"
-      description="依照 `ui-ux-pro-max` 技能給出的醫療與企業儀表板建議，首頁改成偏信任感、資料密度與無障礙導向的控制台。你可以在同一個介面追蹤開發任務、文件版次、階段關卡、條件式放行與變更管理。"
+      description="掌握所有醫療器材專案的研發進度、合規文件與遺留風險，確保設計移轉順利進行。"
       actions={<ActionLink href="/projects" label="進入專案總覽" />}
     >
       <div className="app-grid-4" style={{ marginBottom: 22 }}>
@@ -60,23 +59,6 @@ export default async function HomePage() {
 
       <div className="app-grid-2" style={{ marginBottom: 20 }}>
         <SectionCard
-          title="推薦介面方向"
-          subtitle="根據技能搜尋結果，我採用『信任與權威（Trust & Authority）＋高資訊密度儀表板（Data-Dense Dashboard）＋包容式設計（Inclusive Design）』的混合風格來重塑這套產品。"
-        >
-          <div style={{ display: 'grid', gap: 12 }}>
-            <div style={calloutStyle}>
-              <strong>視覺語言：</strong> 醫療級藍綠 + 企業級高對比卡片，降低焦慮感，同時保留審查嚴謹度。
-            </div>
-            <div style={calloutStyle}>
-              <strong>資訊結構：</strong> 把「當前階段」「遺留項」「已發行文件」「變更單」放在首頁第一層，符合專案與品質團隊的判讀順序。
-            </div>
-            <div style={calloutStyle}>
-              <strong>無障礙：</strong> 加入 skip link、顯著 focus 樣式、行動優先格線與一致的狀態色票。
-            </div>
-          </div>
-        </SectionCard>
-
-        <SectionCard
           title="快速入口"
           subtitle="用最少點擊進入最常用的工作面。"
           tone="dark"
@@ -89,9 +71,7 @@ export default async function HomePage() {
             <ActionLink href="/pending-items" label="查看遺留項" tone="secondary" />
           </div>
         </SectionCard>
-      </div>
 
-      <div className="app-grid-2" style={{ marginBottom: 22 }}>
         <SectionCard
           title="重點專案"
           subtitle="最近最活躍的專案會顯示在這裡，方便專案經理快速辨識風險與進度。"
@@ -156,7 +136,9 @@ export default async function HomePage() {
             ))}
           </div>
         </SectionCard>
+      </div>
 
+      <div className="app-grid-2" style={{ marginBottom: 22 }}>
         <SectionCard
           title="最近階段異動"
           subtitle="最後六筆階段推進與條件式放行紀錄，方便法規與專案雙方交叉檢視。"
@@ -200,12 +182,3 @@ export default async function HomePage() {
     </AppShell>
   )
 }
-
-const calloutStyle = {
-  borderRadius: 18,
-  padding: 16,
-  background: 'rgba(255,255,255,0.76)',
-  border: '1px solid var(--app-border)',
-  lineHeight: 1.7,
-  color: 'var(--app-text-soft)',
-} satisfies CSSProperties

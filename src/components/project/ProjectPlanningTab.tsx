@@ -65,8 +65,11 @@ interface Props {
 export function ProjectPlanningTab({ project, lookupUsers }: Props) {
   const router = useRouter()
   const [taskDialogOpen, setTaskDialogOpen] = useState(false)
+  const [taskError, setTaskError] = useState<string | null>(null)
   const [deliverableDialogOpen, setDeliverableDialogOpen] = useState(false)
+  const [deliverableError, setDeliverableError] = useState<string | null>(null)
   const [selectedTaskForEdit, setSelectedTaskForEdit] = useState<Task | null>(null)
+  const [editTaskError, setEditTaskError] = useState<string | null>(null)
 
   const rdUsers = lookupUsers.filter((u) => u.role === Role.RD)
   const qaUsers = lookupUsers.filter((u) => u.role === Role.QA || u.role === Role.ADMIN)
@@ -196,6 +199,7 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
 
             <form
               action={async (formData: FormData) => {
+                setTaskError(null)
                 const res = await createTaskAction({
                   projectId: project.id,
                   code: String(formData.get('code') ?? ''),
@@ -211,10 +215,21 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
                 if (res.success) {
                   setTaskDialogOpen(false)
                   router.refresh()
+                } else {
+                  setTaskError(res.error || '建立任務失敗，請稍後再試')
                 }
               }}
               className="flex flex-col gap-4"
             >
+              {taskError && (
+                <div className="flex items-center gap-2.5 rounded-lg bg-red-50 px-3.5 py-3 text-[13px] font-bold text-red-700">
+                  <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {taskError}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <input name="code" placeholder="任務代碼（如 DI-001）" className={darkInputClass} required />
                 <input name="title" placeholder="任務名稱" className={darkInputClass} required />
@@ -314,6 +329,7 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
 
             <form
               action={async (formData: FormData) => {
+                setDeliverableError(null)
                 const res = await createDeliverableAction({
                   projectId: project.id,
                   code: String(formData.get('code') ?? ''),
@@ -328,10 +344,21 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
                 if (res.success) {
                   setDeliverableDialogOpen(false)
                   router.refresh()
+                } else {
+                  setDeliverableError(res.error || '建立文件空殼失敗，請稍後再試')
                 }
               }}
               className="flex flex-col gap-4"
             >
+              {deliverableError && (
+                <div className="flex items-center gap-2.5 rounded-lg bg-red-50 px-3.5 py-3 text-[13px] font-bold text-red-700">
+                  <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {deliverableError}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <input name="code" placeholder="文件代碼（如 DHF-001）" className={darkInputClass} required />
                 <input name="title" placeholder="文件名稱" className={darkInputClass} required />
@@ -392,6 +419,7 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
             <form
               onSubmit={async (e) => {
                 e.preventDefault()
+                setEditTaskError(null)
                 const formData = new FormData(e.currentTarget)
                 const title = formData.get('title') as string
                 const description = formData.get('description') as string | null
@@ -411,10 +439,21 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
                 if (res.success) {
                   setSelectedTaskForEdit(null)
                   router.refresh()
+                } else {
+                  setEditTaskError(res.error || '更新任務失敗，請稍後再試')
                 }
               }}
               className="space-y-4"
             >
+              {editTaskError && (
+                <div className="flex items-center gap-2.5 rounded-lg bg-red-50 px-3.5 py-3 text-[13px] font-bold text-red-700">
+                  <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {editTaskError}
+                </div>
+              )}
+
               <div>
                 <label htmlFor="title" className="block text-[12px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
                   標題

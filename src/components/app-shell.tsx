@@ -133,34 +133,6 @@ export function AppShell({
                   />
                 ))}
               </nav>
-
-              <div
-                style={{
-                  marginTop: 20,
-                  borderRadius: 22,
-                  padding: 16,
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                }}
-              >
-                <div style={{ fontSize: 12, color: 'rgba(223, 247, 252, 0.7)' }}>
-                  介面風格
-                </div>
-                <div
-                  style={{
-                    marginTop: 6,
-                    fontWeight: 700,
-                    fontSize: 18,
-                    color: '#f2fbfc',
-                  }}
-                >
-                  信任感 + 資料密度 + 可稽核
-                </div>
-                <div style={{ marginTop: 8, lineHeight: 1.7, color: 'rgba(223, 247, 252, 0.78)' }}>
-                  依據 `ui-ux-pro-max` 的醫療 / 企業儀表板建議，採用清爽藍綠配色、
-                  高對比資訊卡與明確狀態提示。
-                </div>
-              </div>
             </div>
           </aside>
 
