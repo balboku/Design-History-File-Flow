@@ -23,8 +23,8 @@ export default async function HomePage() {
   return (
     <AppShell
       eyebrow="醫療器材研發管理平台"
-      title="讓研發偷跑有軌跡，讓合規放行有依據"
-      description="掌握所有醫療器材專案的研發進度、合規文件與遺留風險，確保設計移轉順利進行。"
+      title="專案與合規管理總覽"
+      description="集中追蹤開發任務、文件版次、階段關卡與變更管理，確保研發流程符合醫療器材品質管理規範。"
       actions={<ActionLink href="/projects" label="進入專案總覽" />}
     >
       <div className="app-grid-4" style={{ marginBottom: 22 }}>
@@ -58,20 +58,6 @@ export default async function HomePage() {
       )}
 
       <div className="app-grid-2" style={{ marginBottom: 20 }}>
-        <SectionCard
-          title="快速入口"
-          subtitle="用最少點擊進入最常用的工作面。"
-          tone="dark"
-        >
-          <div style={{ display: 'grid', gap: 12 }}>
-            <ActionLink href="/tasks" label="查看開發任務" />
-            <ActionLink href="/deliverables" label="查看合規文件" tone="secondary" />
-            <ActionLink href="/phase-gates" label="查看階段關卡" tone="secondary" />
-            <ActionLink href="/change-requests" label="查看變更管理" tone="secondary" />
-            <ActionLink href="/pending-items" label="查看遺留項" tone="secondary" />
-          </div>
-        </SectionCard>
-
         <SectionCard
           title="重點專案"
           subtitle="最近最活躍的專案會顯示在這裡，方便專案經理快速辨識風險與進度。"
