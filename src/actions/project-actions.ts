@@ -1,6 +1,6 @@
 'use server'
 
-import { createProject } from '@/lib/project-service'
+import { createProject, type TemplateType } from '@/lib/project-service'
 
 export interface CreateProjectActionInput {
   code: string
@@ -9,11 +9,13 @@ export interface CreateProjectActionInput {
   currentPhase?: import('@prisma/client').ProjectPhase
   ownerId?: string | null
   targetEndDate?: string | null
+  templateType?: TemplateType
 }
 
 export type CreateProjectActionResult = {
   success: true
   data: Awaited<ReturnType<typeof createProject>>['project']
+  deliverableCount: number
 } | {
   success: false
   error: string
@@ -27,7 +29,7 @@ export async function createProjectAction(
       ...input,
       targetEndDate: input.targetEndDate ? new Date(input.targetEndDate) : null,
     })
-    return { success: true, data: result.project }
+    return { success: true, data: result.project, deliverableCount: result.deliverableCount }
   } catch (err) {
     return {
       success: false,

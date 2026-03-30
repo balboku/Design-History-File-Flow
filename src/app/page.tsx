@@ -1,13 +1,23 @@
 import type { CSSProperties } from 'react'
+import { Role } from '@prisma/client'
 import { ActionLink, AppShell, MetricCard, SectionCard, StatusPill } from '@/components/app-shell'
-import { getAppDashboardData, getProjectSummaries } from '@/lib/frontend-data'
+import { getAppDashboardData, getProjectSummaries, getWorkspaceLookupData } from '@/lib/frontend-data'
+import { getReviewInboxData } from '@/lib/review-inbox-service'
+import { ReviewInbox } from '@/components/ReviewInbox'
 import { formatDateTimeZh, formatProjectPhase } from '@/lib/ui-labels'
 
 export default async function HomePage() {
-  const [dashboard, projects] = await Promise.all([
+  const [dashboard, projects, inboxData, lookup] = await Promise.all([
     getAppDashboardData(),
     getProjectSummaries(),
+    getReviewInboxData(),
+    getWorkspaceLookupData(),
   ])
+
+  // NOTE: Fake current user - get first QA or ADMIN user from lookup
+  const qaOrAdminUser = lookup.users.find((u) => u.role === Role.QA || u.role === Role.ADMIN)
+  // Fallback to the first user if no QA/ADMIN exists during testing
+  const currentUser = qaOrAdminUser ?? lookup.users[0]
 
   const highlightedProjects = projects.slice(0, 3)
 
@@ -43,6 +53,10 @@ export default async function HomePage() {
           accent="var(--app-danger)"
         />
       </div>
+
+      {currentUser && (
+        <ReviewInbox inboxData={inboxData} currentUser={currentUser} />
+      )}
 
       <div className="app-grid-2" style={{ marginBottom: 20 }}>
         <SectionCard

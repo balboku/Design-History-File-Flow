@@ -14,6 +14,7 @@ import {
   SectionCard,
   StatusPill,
 } from '@/components/app-shell'
+import { CreateChangeRequestForm } from '@/components/change-requests/CreateChangeRequestForm'
 import {
   getChangeRequestBoardData,
   getWorkspaceLookupData,
@@ -161,94 +162,13 @@ export default async function ChangeRequestsPage({
           subtitle="至少要連結專案、文件或料件其中一種，才能保有完整的設計變更追溯。"
           tone="dark"
         >
-          <form action={createChangeRequestForm} style={{ display: 'grid', gap: 10 }}>
-            <input name="code" placeholder="CR 編號" style={darkInputStyle} />
-            <input name="title" placeholder="變更單名稱" style={darkInputStyle} />
-            <textarea
-              name="description"
-              placeholder="變更內容說明"
-              style={{ ...darkInputStyle, minHeight: 90, resize: 'vertical' }}
-            />
-            <textarea
-              name="impactSummary"
-              placeholder="影響評估摘要"
-              required
-              style={{ ...darkInputStyle, minHeight: 120, resize: 'vertical' }}
-            />
-            <textarea
-              name="regulatoryImpact"
-              placeholder="法規影響"
-              style={{ ...darkInputStyle, minHeight: 88, resize: 'vertical' }}
-            />
-            <textarea
-              name="productRiskImpact"
-              placeholder="產品風險影響"
-              style={{ ...darkInputStyle, minHeight: 88, resize: 'vertical' }}
-            />
-            <textarea
-              name="verificationImpact"
-              placeholder="驗證影響"
-              style={{ ...darkInputStyle, minHeight: 88, resize: 'vertical' }}
-            />
-            <textarea
-              name="validationImpact"
-              placeholder="確效影響"
-              style={{ ...darkInputStyle, minHeight: 88, resize: 'vertical' }}
-            />
-            <textarea
-              name="manufacturingImpact"
-              placeholder="製造 / 移轉影響"
-              style={{ ...darkInputStyle, minHeight: 88, resize: 'vertical' }}
-            />
-            <textarea
-              name="documentationImpact"
-              placeholder="文件影響"
-              style={{ ...darkInputStyle, minHeight: 88, resize: 'vertical' }}
-            />
-            <select name="projectId" defaultValue="" style={darkInputStyle}>
-              <option value="">尚未指定專案</option>
-              {lookup.projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.code} · {project.name}
-                </option>
-              ))}
-            </select>
-            <select name="requesterId" defaultValue="" style={darkInputStyle}>
-              <option value="">提出人</option>
-              {lookup.users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name} · {formatRole(user.role)}
-                </option>
-              ))}
-            </select>
-            <select
-              name="deliverableIds"
-              multiple
-              defaultValue={[]}
-              style={{ ...darkInputStyle, minHeight: 140 }}
-            >
-              {lookup.deliverables.map((deliverable) => (
-                <option key={deliverable.id} value={deliverable.id}>
-                  {deliverable.projectCode} · {deliverable.code} · {deliverable.title}
-                </option>
-              ))}
-            </select>
-            <select
-              name="partComponentIds"
-              multiple
-              defaultValue={[]}
-              style={{ ...darkInputStyle, minHeight: 120 }}
-            >
-              {lookup.parts.map((part) => (
-                <option key={part.id} value={part.id}>
-                  {part.partNumber} · {part.name}
-                </option>
-              ))}
-            </select>
-            <button type="submit" style={lightButtonStyle}>
-              建立變更單
-            </button>
-          </form>
+          <CreateChangeRequestForm
+            action={createChangeRequestForm}
+            projects={lookup.projects}
+            users={lookup.users.map(u => ({ id: u.id, name: u.name, role: formatRole(u.role) }))}
+            deliverables={lookup.deliverables}
+            parts={lookup.parts}
+          />
         </SectionCard>
 
         <SectionCard

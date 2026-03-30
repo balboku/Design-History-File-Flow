@@ -153,7 +153,7 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
             body="點擊「建立開發任務」以建立第一筆可追溯的 RD 任務。"
           />
         ) : (
-          <KanbanBoard tasks={kanbanTasks} lookupUsers={lookupUsers} />
+          <KanbanBoard projectId={project.id} tasks={kanbanTasks} lookupUsers={lookupUsers} />
         )}
       </SectionCard>
 

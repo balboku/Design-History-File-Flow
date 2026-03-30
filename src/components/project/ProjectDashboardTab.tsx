@@ -13,6 +13,7 @@ import {
 import { ProjectGantt } from '@/components/project-gantt'
 import { PHASE_ORDER } from '@/lib/phase-service'
 import { advancePhaseAction } from '@/actions/phase-actions'
+import { ComplianceDebtRadar } from '@/components/project/ComplianceDebtRadar'
 import {
   formatProjectPhase,
   formatTaskStatus,
@@ -71,6 +72,14 @@ interface Task {
   deliverableLinks: { deliverable: { code: string } }[]
 }
 
+interface Deliverable {
+  id: string
+  status: string
+  isRequired?: boolean
+  targetDate?: Date | string | null
+  fileRevisions?: { id: string }[]
+}
+
 interface Project {
   id: string
   code: string
@@ -79,6 +88,7 @@ interface Project {
   tasks: Task[]
   pendingItems: PendingItem[]
   phaseTransitions: Transition[]
+  deliverables: Deliverable[]
 }
 
 interface Props {
@@ -122,6 +132,15 @@ export function ProjectDashboardTab({ project, gate, lookupUsers }: Props) {
           label="未結遺留項"
           value={String(openPendingItems)}
           accent={openPendingItems > 0 ? 'var(--app-danger)' : 'var(--app-text-soft)'}
+        />
+      </div>
+
+      {/* 1b. Compliance Debt Radar */}
+      <div className="col-span-12">
+        <ComplianceDebtRadar
+          deliverables={project.deliverables}
+          pendingItems={project.pendingItems}
+          currentPhase={project.currentPhase}
         />
       </div>
 

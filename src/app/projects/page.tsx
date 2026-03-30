@@ -47,10 +47,12 @@ export default async function ProjectsPage({
       currentPhase: String(formData.get('currentPhase') ?? ProjectPhase.Concept) as ProjectPhase,
       ownerId: String(formData.get('ownerId') ?? '') || undefined,
       targetEndDate: String(formData.get('targetEndDate') ?? '') || null,
+      templateType: String(formData.get('templateType') ?? 'None') as 'None' | 'Standard' | 'SaMD',
     })
 
     if (result.success) {
-      redirect(buildUrl({ notice: `已建立專案 ${result.data.code}` }))
+      const tmplNote = result.deliverableCount > 0 ? `，已自動建立 ${result.deliverableCount} 份文件空殼` : ''
+      redirect(buildUrl({ notice: `已建立專案 ${result.data.code}${tmplNote}` }))
     }
 
     redirect(buildUrl({ error: result.error }))
@@ -199,13 +201,29 @@ export default async function ProjectsPage({
           tone="dark"
         >
           <form action={createProjectForm} style={{ display: 'grid', gap: 10 }}>
-            <input name="code" placeholder="專案代碼" style={darkInputStyle} />
-            <input name="name" placeholder="專案名稱" style={darkInputStyle} />
+            <input name="code" placeholder="專案代碼" style={darkInputStyle} required />
+            <input name="name" placeholder="專案名稱" style={darkInputStyle} required />
             <textarea
               name="description"
               placeholder="專案摘要"
               style={{ ...darkInputStyle, minHeight: 100, resize: 'vertical' }}
             />
+
+            {/* ── Phase Template Selector ───────────────────────────────────── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: 12, color: 'rgba(255,244,228,0.6)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                文件範本（自動建立文件空殼）
+              </label>
+              <select name="templateType" defaultValue="Standard" style={darkInputStyle}>
+                <option value="None">不使用範本（手動建立）</option>
+                <option value="Standard">Standard — 硬體&amp;組合器材（8 份）</option>
+                <option value="SaMD">SaMD — 醫療軟體 IEC 62304（10 份）</option>
+              </select>
+              <div style={{ fontSize: 12, color: 'rgba(255,244,228,0.5)', lineHeight: 1.5 }}>
+                依選擇範本自動建立對應階段的文件空殼，建立後可自由新增或刪除。
+              </div>
+            </div>
+
             <select name="currentPhase" defaultValue={ProjectPhase.Concept} style={darkInputStyle}>
               {Object.values(ProjectPhase).map((phase) => (
                 <option key={phase} value={phase}>
@@ -221,12 +239,8 @@ export default async function ProjectsPage({
                 </option>
               ))}
             </select>
-            <label style={{ fontSize: 13, color: 'rgba(255,244,228,0.7)', marginBottom: -4 }}>預計完成日 (targetEndDate)</label>
-            <input
-              type="date"
-              name="targetEndDate"
-              style={darkInputStyle}
-            />
+            <label style={{ fontSize: 13, color: 'rgba(255,244,228,0.7)', marginBottom: -4 }}>預計完成日</label>
+            <input type="date" name="targetEndDate" style={darkInputStyle} />
             <button type="submit" style={lightButtonStyle}>
               建立專案
             </button>
