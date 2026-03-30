@@ -65,6 +65,18 @@ export function CreateChangeRequestForm({ action, projects, users, deliverables,
   const [selectedDeliverables, setSelectedDeliverables] = useState<string[]>([])
   const [impactSummary, setImpactSummary] = useState('')
   const [showChecklist, setShowChecklist] = useState(false)
+  const [impactToggles, setImpactToggles] = useState({
+    regulatory: false,
+    productRisk: false,
+    verification: false,
+    validation: false,
+    manufacturing: false,
+    documentation: false,
+  })
+
+  const handleToggleChange = (key: keyof typeof impactToggles) => {
+    setImpactToggles((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
 
   // Determine which questions to show based on selection
   const handleDeliverablesChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -161,13 +173,104 @@ export function CreateChangeRequestForm({ action, projects, users, deliverables,
         style={{ ...darkInputStyle, minHeight: 120, resize: 'vertical' }}
       />
       
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <textarea name="regulatoryImpact" placeholder="法規影響" style={{ ...darkInputStyle, minHeight: 88, resize: 'vertical' }} />
-        <textarea name="productRiskImpact" placeholder="產品風險影響" style={{ ...darkInputStyle, minHeight: 88, resize: 'vertical' }} />
-        <textarea name="verificationImpact" placeholder="驗證影響" style={{ ...darkInputStyle, minHeight: 88, resize: 'vertical' }} />
-        <textarea name="validationImpact" placeholder="確效影響" style={{ ...darkInputStyle, minHeight: 88, resize: 'vertical' }} />
-        <textarea name="manufacturingImpact" placeholder="製造 / 移轉影響" style={{ ...darkInputStyle, minHeight: 88, resize: 'vertical' }} />
-        <textarea name="documentationImpact" placeholder="文件影響" style={{ ...darkInputStyle, minHeight: 88, resize: 'vertical' }} />
+      <div style={{ 
+        background: 'rgba(248,250,252,0.6)', 
+        border: '1px solid rgba(203,213,225,0.4)', 
+        borderRadius: 16, 
+        padding: 16,
+        display: 'grid',
+        gap: 12
+      }}>
+        <div style={{ color: '#64748b', fontSize: 13, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          影響分析項目
+        </div>
+        
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 16px' }}>
+          {[
+            { key: 'regulatory' as const, label: '法規影響' },
+            { key: 'productRisk' as const, label: '產品風險' },
+            { key: 'verification' as const, label: '驗證影響' },
+            { key: 'validation' as const, label: '確效影響' },
+            { key: 'manufacturing' as const, label: '製造/移轉' },
+            { key: 'documentation' as const, label: '文件影響' },
+          ].map(({ key, label }) => (
+            <label
+              key={key}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                cursor: 'pointer',
+                padding: '6px 10px',
+                borderRadius: 8,
+                background: impactToggles[key] ? 'rgba(11,99,120,0.1)' : 'transparent',
+                border: `1px solid ${impactToggles[key] ? 'rgba(11,99,120,0.3)' : 'transparent'}`,
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={impactToggles[key]}
+                onChange={() => handleToggleChange(key)}
+                style={{ width: 16, height: 16, accentColor: 'var(--app-primary-strong)' }}
+              />
+              <span style={{ fontSize: 14, color: impactToggles[key] ? 'var(--app-primary-strong)' : '#475569', fontWeight: 500 }}>
+                {label}
+              </span>
+            </label>
+          ))}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
+          {impactToggles.regulatory && (
+            <textarea 
+              name="regulatoryImpact" 
+              placeholder="說明此變更對法規合規的影響..." 
+              required
+              style={{ ...baseInputStyle, minHeight: 88, resize: 'vertical', background: '#fff', border: '1px solid #e2e8f0' }} 
+            />
+          )}
+          {impactToggles.productRisk && (
+            <textarea 
+              name="productRiskImpact" 
+              placeholder="說明此變更對產品風險的影響..." 
+              required
+              style={{ ...baseInputStyle, minHeight: 88, resize: 'vertical', background: '#fff', border: '1px solid #e2e8f0' }} 
+            />
+          )}
+          {impactToggles.verification && (
+            <textarea 
+              name="verificationImpact" 
+              placeholder="說明此變更對驗證活動的影響..." 
+              required
+              style={{ ...baseInputStyle, minHeight: 88, resize: 'vertical', background: '#fff', border: '1px solid #e2e8f0' }} 
+            />
+          )}
+          {impactToggles.validation && (
+            <textarea 
+              name="validationImpact" 
+              placeholder="說明此變更對確效活動的影響..." 
+              required
+              style={{ ...baseInputStyle, minHeight: 88, resize: 'vertical', background: '#fff', border: '1px solid #e2e8f0' }} 
+            />
+          )}
+          {impactToggles.manufacturing && (
+            <textarea 
+              name="manufacturingImpact" 
+              placeholder="說明此變更對製造或設計移轉的影響..." 
+              required
+              style={{ ...baseInputStyle, minHeight: 88, resize: 'vertical', background: '#fff', border: '1px solid #e2e8f0' }} 
+            />
+          )}
+          {impactToggles.documentation && (
+            <textarea 
+              name="documentationImpact" 
+              placeholder="說明此變更對文件更新的影響..." 
+              required
+              style={{ ...baseInputStyle, minHeight: 88, resize: 'vertical', background: '#fff', border: '1px solid #e2e8f0' }} 
+            />
+          )}
+        </div>
       </div>
 
       <select name="projectId" defaultValue="" style={darkInputStyle}>

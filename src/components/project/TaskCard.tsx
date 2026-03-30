@@ -3,8 +3,7 @@
 import { useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { ProjectPhase, Role } from '@prisma/client'
-import { formatProjectPhase, formatTaskStatus } from '@/lib/ui-labels'
+import { ProjectPhase } from '@prisma/client'
 
 export interface KanbanTask {
   id: string
@@ -28,6 +27,16 @@ export interface KanbanTask {
   attachments?: {
     id: string
     fileName: string
+  }[]
+  checklistItems?: {
+    id: string
+    content: string
+    isCompleted: boolean
+  }[]
+  blockedBy?: {
+    id: string
+    status: string
+    title: string
   }[]
 }
 
@@ -60,13 +69,23 @@ export function TaskCard({ task, isDragOverlay = false, onFileDrop, onClick }: P
   const allFilesUploaded = task.deliverableLinks.length > 0 && missingFiles.length === 0
   const uploadedCount = task.deliverableLinks.length - missingFiles.length
 
+  const checklistItems = task.checklistItems || []
+  const completedCount = checklistItems.filter(item => item.isCompleted).length
+  const hasChecklists = checklistItems.length > 0
+
+  const isBlocked = task.blockedBy && task.blockedBy.length > 0 && 
+    task.blockedBy.some(blocked => blocked.status !== 'Done')
+
   // 计算任务进度百分比
   const getProgressPercentage = (): number => {
     if (task.status === 'Done') return 100
     if (task.status === 'InProgress') {
-      // 基于文件上传进度计算
+      if (hasChecklists) {
+        const checklistProgress = (completedCount / checklistItems.length) * 100
+        return Math.round(Math.min(checklistProgress, 99))
+      }
       const fileProgress = uploadedCount / task.deliverableLinks.length * 100
-      return Math.round(Math.min(fileProgress, 99)) // 最多99%，直到标记完成
+      return Math.round(Math.min(fileProgress, 99))
     }
     return 0
   }
@@ -125,14 +144,23 @@ export function TaskCard({ task, isDragOverlay = false, onFileDrop, onClick }: P
         </div>
       )}
 
-      {/* Task code + overdued badge */}
+      {/* Task code + warning badge */}
       <div className="flex items-start justify-between gap-2 mb-2">
         <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
           {task.code}
         </span>
-        {isOverdue && (
-          <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-bold text-red-600">逾期</span>
-        )}
+        <div className="flex gap-1">
+          {isBlocked && (
+            <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+              被阻擋
+            </span>
+          )}
+          {(isOverdue || missingFiles.length > 0) && (
+            <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-bold text-red-600">
+              {isOverdue ? '逾期' : '缺檔'}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Title */}
@@ -148,12 +176,10 @@ export function TaskCard({ task, isDragOverlay = false, onFileDrop, onClick }: P
           </svg>
           {task.assignee?.name ?? '未指派'}
         </span>
-        <span className="text-slate-300">·</span>
-        <span>{formatProjectPhase(task.plannedPhase)}</span>
       </div>
 
-      {/* Deliverable progress dots */}
-      {task.deliverableLinks.length > 0 && (
+      {/* Progress section - Checklist or Deliverable */}
+      {(hasChecklists || task.deliverableLinks.length > 0) && (
         <div className="mt-3 flex flex-col gap-2">
           {/* Progress Bar */}
           <div className="flex items-center justify-between gap-2">
@@ -168,25 +194,49 @@ export function TaskCard({ task, isDragOverlay = false, onFileDrop, onClick }: P
             </span>
           </div>
 
-          {/* File Status */}
-          <div className="flex items-center gap-1">
-            {task.deliverableLinks.map((l) => (
-              <span
-                key={l.deliverable.id}
-                title={`${l.deliverable.code} · ${l.deliverable.fileRevisions.length > 0 ? '已上傳' : '缺少版次'}`}
-                className={`h-2.5 w-2.5 rounded-full border transition-colors ${
-                  l.deliverable.fileRevisions.length > 0
-                    ? 'bg-emerald-400 border-emerald-300'
-                    : 'bg-white border-slate-300'
-                }`}
-              />
-            ))}
-          </div>
+          {/* Checklist Status */}
+          {hasChecklists && (
+            <div className="flex items-center gap-1">
+              {checklistItems.map((item) => (
+                <span
+                  key={item.id}
+                  title={item.content}
+                  className={`h-2.5 w-2.5 rounded-full border transition-colors ${
+                    item.isCompleted
+                      ? 'bg-emerald-400 border-emerald-300'
+                      : 'bg-white border-slate-300'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Deliverable Status (if no checklists) */}
+          {!hasChecklists && task.deliverableLinks.length > 0 && (
+            <div className="flex items-center gap-1">
+              {task.deliverableLinks.map((l) => (
+                <span
+                  key={l.deliverable.id}
+                  title={`${l.deliverable.code} · ${l.deliverable.fileRevisions.length > 0 ? '已上傳' : '待上傳'}`}
+                  className={`h-2.5 w-2.5 rounded-full border transition-colors ${
+                    l.deliverable.fileRevisions.length > 0
+                      ? 'bg-emerald-400 border-emerald-300'
+                      : 'bg-white border-slate-300'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+
           <span className={`text-[11px] font-bold ${
-            allFilesUploaded ? 'text-emerald-600' : 'text-slate-400'
+            (hasChecklists ? completedCount === checklistItems.length : allFilesUploaded) ? 'text-emerald-600' : 'text-slate-400'
           }`}>
-            {uploadedCount}/{task.deliverableLinks.length} 合規文件 {attachmentCount > 0 && `· ${attachmentCount} 參考附件`}
-            {allFilesUploaded && task.status === 'InProgress' && ' · 可結案'}
+            {hasChecklists 
+              ? `${completedCount}/${checklistItems.length} 項目完成`
+              : `${uploadedCount}/${task.deliverableLinks.length} 交付項目`
+            }
+            {attachmentCount > 0 && ` · ${attachmentCount} 附件`}
+            {(hasChecklists ? completedCount === checklistItems.length : allFilesUploaded) && task.status === 'InProgress' && ' · 可結案'}
           </span>
         </div>
       )}
@@ -197,7 +247,7 @@ export function TaskCard({ task, isDragOverlay = false, onFileDrop, onClick }: P
           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
-          缺少 {missingFiles.length} 份文件 — 拖曳至完成時需上傳
+          缺少 {missingFiles.length} 項交付項目
         </div>
       )}
     </div>

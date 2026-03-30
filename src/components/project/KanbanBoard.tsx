@@ -22,7 +22,10 @@ import { QuickUploadModal } from './QuickUploadModal'
 // ─── Task Edit Dialog Component ────────────────────────────────────────────
 
 interface TaskEditDialogProps {
-  task: KanbanTask
+  task: KanbanTask & {
+    checklistItems?: { id: string; content: string; isCompleted: boolean }[]
+    blockedBy?: { id: string; status: string; title: string }[]
+  }
   lookupUsers: { id: string; name: string; role: Role }[]
   onClose: () => void
   onSaveSuccess: () => void
@@ -34,6 +37,11 @@ function TaskEditDialog({ task, lookupUsers, onClose, onSaveSuccess }: TaskEditD
   const [isUploadingFile, setIsUploadingFile] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const [attachments, setAttachments] = useState<Array<{ id: string; fileName: string }>>(task.attachments || [])
+  const [checklists, setChecklists] = useState<Array<{ id: string; content: string; isCompleted: boolean }>>(task.checklistItems || [])
+  const [newChecklistItem, setNewChecklistItem] = useState('')
+  const [comments, setComments] = useState<Array<{ id: string; content: string; authorName: string; createdAt: string }>>([])
+  const [newComment, setNewComment] = useState('')
+  const [showChecklistSection, setShowChecklistSection] = useState(false)
   const router = useRouter()
 
   const currentUserId = lookupUsers.find((u) => u.role === 'RD')?.id || ''
@@ -315,6 +323,154 @@ function TaskEditDialog({ task, lookupUsers, onClose, onSaveSuccess }: TaskEditD
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Checklist Section */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowChecklistSection(!showChecklistSection)}
+              className="flex items-center justify-between w-full text-[12px] font-bold uppercase tracking-wider text-slate-600 mb-1.5 hover:text-slate-800"
+            >
+              <span>子任務清單</span>
+              <svg 
+                className={`h-4 w-4 transition-transform ${showChecklistSection ? 'rotate-180' : ''}`} 
+                fill="none" viewBox="0 0 24 24" stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {showChecklistSection && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                {/* Checklist Items */}
+                {checklists.length > 0 && (
+                  <div className="flex flex-col gap-1.5 mb-3">
+                    {checklists.map((item) => (
+                      <label
+                        key={item.id}
+                        className="flex items-center gap-2 cursor-pointer group"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={item.isCompleted}
+                          onChange={() => {
+                            setChecklists(checklists.map(c => 
+                              c.id === item.id ? { ...c, isCompleted: !c.isCompleted } : c
+                            ))
+                          }}
+                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className={`text-[13px] ${item.isCompleted ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                          {item.content}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add New Checklist Item */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newChecklistItem}
+                    onChange={(e) => setNewChecklistItem(e.target.value)}
+                    placeholder="新增子任務..."
+                    className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newChecklistItem.trim()) {
+                        setChecklists([...checklists, { 
+                          id: 'temp-' + Date.now(), 
+                          content: newChecklistItem.trim(), 
+                          isCompleted: false 
+                        }])
+                        setNewChecklistItem('')
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (newChecklistItem.trim()) {
+                        setChecklists([...checklists, { 
+                          id: 'temp-' + Date.now(), 
+                          content: newChecklistItem.trim(), 
+                          isCompleted: false 
+                        }])
+                        setNewChecklistItem('')
+                      }
+                    }}
+                    className="shrink-0 rounded-lg bg-blue-500 px-3 py-2 text-[13px] font-bold text-white hover:bg-blue-600"
+                  >
+                    新增
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Comments Section */}
+          <div>
+            <div className="text-[12px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+              討論留言
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              {/* Existing Comments */}
+              {comments.length > 0 && (
+                <div className="flex flex-col gap-2 mb-3 max-h-32 overflow-y-auto">
+                  {comments.map((comment) => (
+                    <div key={comment.id} className="rounded-lg bg-white p-2">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="text-[11px] font-bold text-blue-600">{comment.authorName}</span>
+                        <span className="text-[10px] text-slate-400">
+                          {new Date(comment.createdAt).toLocaleDateString('zh-TW')}
+                        </span>
+                      </div>
+                      <p className="text-[13px] text-slate-700">{comment.content}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add New Comment */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="新增留言..."
+                  className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newComment.trim()) {
+                      setComments([...comments, { 
+                        id: 'temp-' + Date.now(), 
+                        content: newComment.trim(), 
+                        authorName: lookupUsers.find(u => u.role === 'RD')?.name || 'User',
+                        createdAt: new Date().toISOString()
+                      }])
+                      setNewComment('')
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (newComment.trim()) {
+                      setComments([...comments, { 
+                        id: 'temp-' + Date.now(), 
+                        content: newComment.trim(), 
+                        authorName: lookupUsers.find(u => u.role === 'RD')?.name || 'User',
+                        createdAt: new Date().toISOString()
+                      }])
+                      setNewComment('')
+                    }
+                  }}
+                  className="shrink-0 rounded-lg bg-slate-600 px-3 py-2 text-[13px] font-bold text-white hover:bg-slate-700"
+                >
+                  送出
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Buttons */}

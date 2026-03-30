@@ -236,6 +236,21 @@ export async function getProjectDetail(projectId: string) {
             },
             orderBy: { createdAt: 'desc' },
           },
+          checklistItems: {
+            select: {
+              id: true,
+              content: true,
+              isCompleted: true,
+            },
+            orderBy: { createdAt: 'asc' },
+          },
+          blockedBy: {
+            select: {
+              id: true,
+              status: true,
+              title: true,
+            },
+          },
         },
         orderBy: [{ plannedPhase: 'asc' }, { createdAt: 'desc' }],
       },

@@ -54,8 +54,8 @@ export function AppShell({
                 background:
                   'linear-gradient(180deg, var(--app-sidebar), var(--app-sidebar-soft))',
                 color: '#f3fbfc',
-                border: '1px solid rgba(189, 236, 247, 0.14)',
-                boxShadow: '0 28px 80px rgba(3, 33, 44, 0.28)',
+                border: '1px solid rgba(189, 236, 247, 0.1)',
+                boxShadow: '0 16px 48px rgba(3, 33, 44, 0.18)',
                 overflow: 'hidden',
               }}
             >
@@ -183,7 +183,7 @@ export function AppShell({
                   position: 'absolute',
                   inset: 0,
                   background:
-                    'radial-gradient(circle at right top, rgba(11, 137, 166, 0.12), transparent 32%), radial-gradient(circle at 18% 18%, rgba(191, 240, 248, 0.6), transparent 26%)',
+                    'radial-gradient(circle at right top, rgba(11, 137, 166, 0.06), transparent 32%), radial-gradient(circle at 18% 18%, rgba(191, 240, 248, 0.3), transparent 26%)',
                   pointerEvents: 'none',
                 }}
               />
@@ -264,8 +264,8 @@ export function SectionCard({
     <section
       className={
         isDark
-          ? 'rounded-[28px] border border-[rgba(203,241,248,0.12)] bg-[linear-gradient(180deg,rgba(10,73,90,0.96),rgba(8,58,72,0.94))] p-[22px] text-[#f2fbfc] shadow-[0_24px_64px_rgba(4,31,40,0.22)]'
-          : 'rounded-[28px] border border-[var(--app-border)] bg-[var(--app-surface)] p-[22px] text-[var(--app-text)] shadow-[0_18px_50px_rgba(8,41,54,0.08)]'
+          ? 'rounded-[28px] border border-[rgba(203,241,248,0.08)] bg-[linear-gradient(180deg,rgba(12,88,108,0.85),rgba(10,68,84,0.82))] p-[22px] text-[#f2fbfc] shadow-[0_12px_32px_rgba(4,31,40,0.14)]'
+          : 'rounded-[28px] border border-[var(--app-border)] bg-[var(--app-surface)] p-[22px] text-[var(--app-text)] shadow-[0_8px_24px_rgba(8,41,54,0.05)]'
       }
     >
       <div style={{ marginBottom: 18 }}>
@@ -304,7 +304,7 @@ export function MetricCard({
 }) {
   return (
     <div
-      className="rounded-[24px] border border-[var(--app-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(243,249,250,0.94))] p-5 shadow-[0_18px_42px_rgba(8,41,54,0.08)]"
+      className="rounded-[24px] border border-[var(--app-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,250,0.92))] p-5 shadow-[0_6px_18px_rgba(8,41,54,0.04)]"
     >
       <div
         className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[var(--app-text-soft)]"
@@ -394,7 +394,7 @@ export function ActionLink({
             'linear-gradient(135deg, var(--app-primary), var(--app-primary-strong))',
           color: '#f5fbfc',
           border: '1px solid rgba(5, 86, 103, 0.14)',
-          boxShadow: '0 14px 30px rgba(11, 99, 120, 0.22)',
+          boxShadow: '0 8px 20px rgba(11, 99, 120, 0.14)',
         }
       : {
           background: 'rgba(255, 255, 255, 0.78)',
