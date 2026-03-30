@@ -209,6 +209,7 @@ export async function getProjectDetail(projectId: string) {
           assigneeId: true,
           plannedStartDate: true,
           targetDate: true,
+          createdAt: true,
           assignee: {
             select: { id: true, name: true },
           },

@@ -16,8 +16,16 @@ export function ProjectGantt({ tasks }: { tasks: any[] }) {
     if (task.status === 'InProgress') progress = 50
     if (task.status === 'Done') progress = 100
 
-    const start = task.plannedStartDate ? new Date(task.plannedStartDate) : new Date(task.createdAt)
-    const end = task.targetDate ? new Date(task.targetDate) : new Date(start.getTime() + 3 * 24 * 60 * 60 * 1000)
+    // 安全地轉換日期，防止無效日期值
+    const toDate = (d: any): Date => {
+      if (!d) return new Date()
+      const date = new Date(d)
+      if (isNaN(date.getTime())) return new Date()
+      return date
+    }
+
+    const start = toDate(task.plannedStartDate) || toDate(task.createdAt) || new Date()
+    const end = toDate(task.targetDate) || new Date(start.getTime() + 3 * 24 * 60 * 60 * 1000)
 
     let bgColor = '#0b89a6' // Todo
     if (task.status === 'InProgress') bgColor = '#b9711f'
