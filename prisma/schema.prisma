@@ -97,6 +97,7 @@ model Project {
   pendingItems     PendingItem[]
   phaseTransitions PhaseTransition[]
   changeRequests   ChangeRequest[]
+  auditLogs        AuditLog[]               @relation("ProjectAuditLogs")
 
   @@index([currentPhase])
   @@index([ownerId])
@@ -353,12 +354,15 @@ model AuditLog {
   actorId    String?
   detail     String?
   createdAt  DateTime @default(now())
+  projectId  String?
   actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  project    Project? @relation("ProjectAuditLogs", fields: [projectId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([entityType, entityId])
   @@index([actorId])
   @@index([createdAt])
   @@index([action])
+  @@index([projectId])
 }
 
 /// Reference attachments for tasks (non-compliance files)
