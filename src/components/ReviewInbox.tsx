@@ -68,7 +68,7 @@ export function ReviewInbox({ inboxData, currentUser }: Props) {
 
   if (totalPending === 0) {
     return (
-      <SectionCard title="待辦審核收件匣" subtitle="目前沒有需要 QA 或法規審批的項目。">
+      <SectionCard title="待辦審核收件匣" subtitle="目前沒有需要品保或法規審批的項目。">
         <div className="flex items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-10 text-[14px] font-medium text-slate-400">
           無待辦審核項目
         </div>
@@ -79,7 +79,7 @@ export function ReviewInbox({ inboxData, currentUser }: Props) {
   return (
     <SectionCard
       title="待辦審核收件匣"
-      subtitle={`共有 ${totalPending} 件需要 QA 審查的專案合規任務。您可以直接在此一鍵放行或退回。`}
+      subtitle={`共有 ${totalPending} 件需要品保審查的專案合規任務。您可以直接在此一鍵放行或退回。`}
       tone="dark"
     >
       <div className="flex flex-col gap-4">

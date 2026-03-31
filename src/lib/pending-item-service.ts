@@ -71,6 +71,7 @@ export async function syncPendingItems(projectId: string): Promise<void> {
         action: AuditActions.PENDING_ITEM_AUTO_RESOLVE,
         entityType: 'PendingItem',
         entityId: item.id,
+        projectId: item.projectId,
         detail: {
           title: item.title,
           deliverableId: item.deliverableId,
@@ -94,6 +95,7 @@ export async function syncPendingItems(projectId: string): Promise<void> {
         action: AuditActions.PENDING_ITEM_AUTO_REOPEN,
         entityType: 'PendingItem',
         entityId: item.id,
+        projectId: item.projectId,
         detail: {
           title: item.title,
           deliverableId: item.deliverableId,
@@ -219,6 +221,7 @@ export async function resolvePendingItem(
     entityType: 'PendingItem',
     entityId: resolved.id,
     actorId,
+    projectId: resolved.projectId,
     detail: {
       title: resolved.title,
       deliverableId: resolved.deliverableId,

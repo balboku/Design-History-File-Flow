@@ -216,6 +216,7 @@ export async function createChangeRequest(
     entityType: 'ChangeRequest',
     entityId: changeRequest.id,
     actorId: input.requesterId,
+    projectId: resolvedProjectId,
     detail: {
       code: changeRequest.code,
       projectId: resolvedProjectId,
@@ -242,6 +243,7 @@ export async function transitionChangeRequest(
       submittedAt: true,
       approvedAt: true,
       implementedAt: true,
+      projectId: true,
     },
   })
 
@@ -317,6 +319,7 @@ export async function transitionChangeRequest(
     entityType: 'ChangeRequest',
     entityId: updated.id,
     actorId: actedById,
+    projectId: changeRequest.projectId,
     detail: {
       code: updated.code,
       from: changeRequest.status,

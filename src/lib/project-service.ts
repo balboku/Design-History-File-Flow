@@ -95,6 +95,7 @@ export async function createProject(
     entityType: 'Project',
     entityId: project.id,
     actorId: input.ownerId,
+    projectId: project.id,
     detail: { code: project.code, name: project.name, currentPhase: project.currentPhase },
   })
 
@@ -132,6 +133,7 @@ export async function createProject(
           entityType: 'DeliverablePlaceholder',
           entityId: d.id,
           actorId: input.ownerId,
+          projectId: project.id,
           detail: { code: d.code, phase: d.phase, projectId: project.id, auto: true, template: templateKey },
         }),
       ),

@@ -533,6 +533,15 @@ export function KanbanBoard({ projectId, tasks, lookupUsers }: Props) {
   const [ghostUploadedById, setGhostUploadedById] = useState('')
 
   const [errorBanner, setErrorBanner] = useState<string | null>(null)
+  const [filterAssignee, setFilterAssignee] = useState<string>('all')
+
+  const rdUsers = lookupUsers.filter((u) => u.role === 'RD')
+
+  const filteredTasks = tasks.filter((task) => {
+    if (filterAssignee === 'all') return true
+    if (filterAssignee === 'unassigned') return !task.assigneeId
+    return task.assigneeId === filterAssignee
+  })
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -545,7 +554,7 @@ export function KanbanBoard({ projectId, tasks, lookupUsers }: Props) {
 
   const tasksByColumn = COLUMNS.reduce<Record<ColumnId, KanbanTask[]>>(
     (acc, col) => {
-      acc[col] = tasks.filter((t) => getStatus(t) === col)
+      acc[col] = filteredTasks.filter((t) => getStatus(t) === col)
       return acc
     },
     { Todo: [], InProgress: [], Done: [] },
@@ -712,6 +721,26 @@ export function KanbanBoard({ projectId, tasks, lookupUsers }: Props) {
           </button>
         </div>
       )}
+
+      {/* Task Filter */}
+      <div className="flex items-center gap-3">
+        <select
+          value={filterAssignee}
+          onChange={(e) => setFilterAssignee(e.target.value)}
+          className="w-full max-w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] font-medium text-slate-700 focus:border-blue-500 focus:bg-white focus:outline-none"
+        >
+          <option value="all">顯示所有人</option>
+          <option value="unassigned">尚未指派</option>
+          {rdUsers.map((user) => (
+            <option key={user.id} value={user.id}>
+              只看 {user.name} 的任務
+            </option>
+          ))}
+        </select>
+        <span className="text-[12px] text-slate-400">
+          共 {filteredTasks.length} 項任務
+        </span>
+      </div>
 
       <DndContext
         sensors={sensors}

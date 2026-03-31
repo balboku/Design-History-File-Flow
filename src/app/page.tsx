@@ -36,7 +36,7 @@ export default async function HomePage() {
         <MetricCard
           label="進行中任務"
           value={String(dashboard.counts.activeTaskCount)}
-          hint="待開始與執行中的 RD 任務"
+          hint="待開始與執行中的研發任務"
           accent="var(--app-accent)"
         />
         <MetricCard

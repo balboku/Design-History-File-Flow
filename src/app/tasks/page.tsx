@@ -7,9 +7,9 @@ export default async function TasksPage() {
 
   return (
     <AppShell
-      eyebrow="RD 執行總覽"
+      eyebrow="研發任務總覽"
       title="開發任務"
-      description="跨專案檢視所有研發任務，直接看出哪些工作正在偷跑未來階段，哪些任務仍被文件上傳或 QA 釋出狀態卡住。"
+      description="跨專案檢視所有研發任務，直接看出哪些工作正在超前執行，哪些任務仍被文件上傳或品保釋出狀態卡住。"
     >
       <SectionCard
         title="任務流"

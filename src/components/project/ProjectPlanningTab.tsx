@@ -161,7 +161,7 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
         {project.tasks.length === 0 ? (
           <EmptyPanel
             title="尚無任務"
-            body="點擊「建立開發任務」以建立第一筆可追溯的 RD 任務。"
+            body="點擊「建立開發任務」以建立第一筆可追溯的研發任務。"
           />
         ) : (
           <KanbanBoard projectId={project.id} tasks={kanbanTasks} lookupUsers={lookupUsers} />
@@ -245,7 +245,7 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
                 ))}
               </select>
               <select name="assigneeId" defaultValue="" className={darkInputClass}>
-                <option value="">稍後再指派 RD</option>
+                <option value="">稍後再指派研發工程師</option>
                 {rdUsers.map((u) => (
                   <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
@@ -374,7 +374,7 @@ export function ProjectPlanningTab({ project, lookupUsers }: Props) {
                 ))}
               </select>
               <select name="ownerId" defaultValue="" className={darkInputClass}>
-                <option value="">稍後再指定 QA 負責人</option>
+                <option value="">稍後再指定品保負責人</option>
                 {qaUsers.map((u) => (
                   <option key={u.id} value={u.id}>{u.name}</option>
                 ))}

@@ -10,6 +10,7 @@ export interface AuditEntry {
   entityId: string
   actorId?: string | null
   detail?: Record<string, unknown> | string | null
+  projectId?: string | null
 }
 
 // ─── Core ─────────────────────────────────────────────────────────────────────
@@ -38,6 +39,7 @@ export async function recordAudit(
       entityType: entry.entityType,
       entityId: entry.entityId,
       actorId: entry.actorId ?? null,
+      projectId: entry.projectId ?? null,
       detail,
     },
   })

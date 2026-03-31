@@ -377,6 +377,7 @@ export async function advancePhase(
           entityType: 'Project',
           entityId: projectId,
           actorId: triggeredById,
+          projectId: projectId,
           detail: {
             from: current.currentPhase,
             to: target,
@@ -474,6 +475,7 @@ export async function advancePhase(
         entityType: 'Project',
         entityId: projectId,
         actorId: options.overriddenById,
+        projectId: projectId,
         detail: {
           from: current.currentPhase,
           to: target,

@@ -177,6 +177,7 @@ export async function createDeliverable(
     entityType: 'DeliverablePlaceholder',
     entityId: deliverable.id,
     actorId: input.actorId,
+    projectId: input.projectId,
     detail: {
       code: deliverable.code,
       phase: deliverable.phase,
@@ -342,6 +343,7 @@ export async function createFileRevision(
     entityType: 'FileRevision',
     entityId: revision.id,
     actorId: input.uploadedById,
+    projectId: deliverable.projectId,
     detail: {
       deliverableId: input.deliverableId,
       revisionNumber: revision.revisionNumber,
@@ -538,6 +540,7 @@ export async function updateDeliverableStatus(
     entityType: 'DeliverablePlaceholder',
     entityId: deliverable.id,
     actorId: actedById,
+    projectId: deliverable.projectId,
     detail: {
       code: deliverable.code,
       from: existing.status,

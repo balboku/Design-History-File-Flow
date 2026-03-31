@@ -73,7 +73,7 @@ export function ProjectComplianceTab({ project, lookupUsers }: Props) {
       <div className="col-span-12 lg:col-span-8 flex flex-col gap-6">
         <SectionCard
           title="合規文件"
-          subtitle="集中管理檔案版次、QA 釋出狀態，以及因條件式放行而留下的風險債務。"
+          subtitle="集中管理檔案版次、品保釋出狀態，以及因條件式放行而留下的風險債務。"
         >
           {project.deliverables.length === 0 ? (
             <EmptyPanel

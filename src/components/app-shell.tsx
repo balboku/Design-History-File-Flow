@@ -12,7 +12,7 @@ export interface NavItem {
 const navItems: NavItem[] = [
   { href: '/', label: '總覽', caption: '專案戰情中心' },
   { href: '/projects', label: '專案組合', caption: '專案建立與盤點' },
-  { href: '/tasks', label: '開發任務', caption: 'RD 執行流' },
+  { href: '/tasks', label: '開發任務', caption: '研發執行流' },
   { href: '/deliverables', label: '合規文件', caption: 'Placeholder 與版次' },
   { href: '/phase-gates', label: '階段關卡', caption: 'Soft / Hard Gate' },
   { href: '/change-requests', label: '變更管理', caption: '設計移轉後控管' },
@@ -100,7 +100,7 @@ export function AppShell({
                     color: 'rgba(223, 247, 252, 0.82)',
                   }}
                 >
-                  讓 RD 可以敏捷推進，同時保留 QA 與 PM 所需的設計管制軌跡。
+                  協助研發團隊敏捷開發，同時確保專案符合品質保證與法規要求的設計管制軌跡。
                 </p>
               </div>
 

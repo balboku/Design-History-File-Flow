@@ -28,7 +28,7 @@ export default async function DeliverablesPage() {
     <AppShell
       eyebrow="合規文件總覽"
       title="文件空殼總覽"
-      description="集中查看每個文件空殼的狀態、上傳版次、綁定任務與遺留項，讓 QA 與專案經理能快速掌握證據是否齊全。"
+      description="集中查看每個文件空殼的狀態、上傳版次、綁定任務與遺留項，讓品保與專案經理能快速掌握證據是否齊全。"
     >
       <SectionCard
         title="文件註冊表"
@@ -75,7 +75,7 @@ export default async function DeliverablesPage() {
                 </div>
                 <div style={{ marginTop: 10, color: '#5d4a31' }}>
                   版次：{deliverable.fileRevisions.length} · 綁定任務：
-                  {deliverable.taskLinks.length} · QA 負責：
+                  {deliverable.taskLinks.length} · 品保負責：
                   {deliverable.owner?.name ?? '尚未指派'}
                 </div>
                 {deliverable.fileRevisions[0] ? (

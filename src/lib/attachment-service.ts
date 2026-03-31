@@ -37,6 +37,9 @@ export async function createAttachment(input: CreateAttachmentInput): Promise<At
       uploader: {
         select: { name: true },
       },
+      task: {
+        select: { projectId: true },
+      },
     },
   })
 
@@ -45,6 +48,7 @@ export async function createAttachment(input: CreateAttachmentInput): Promise<At
     entityType: 'Attachment',
     entityId: attachment.id,
     actorId: input.uploadedById,
+    projectId: (attachment as any).task.projectId,
     detail: {
       taskId: input.taskId,
       fileName: input.fileName,
@@ -91,6 +95,11 @@ export async function getTaskAttachments(taskId: string): Promise<AttachmentInfo
 export async function deleteAttachment(attachmentId: string, actorId?: string): Promise<void> {
   const attachment = await prisma.attachment.findUnique({
     where: { id: attachmentId },
+    include: {
+      task: {
+        select: { projectId: true },
+      },
+    },
   })
 
   if (!attachment) {
@@ -106,6 +115,7 @@ export async function deleteAttachment(attachmentId: string, actorId?: string): 
     entityType: 'Attachment',
     entityId: attachmentId,
     actorId,
+    projectId: (attachment as any).task.projectId,
     detail: {
       taskId: attachment.taskId,
       fileName: attachment.fileName,

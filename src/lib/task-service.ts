@@ -117,6 +117,7 @@ export async function createTask(input: CreateTaskInput): Promise<CreateTaskResu
     entityType: 'Task',
     entityId: task.id,
     actorId: input.createdById,
+    projectId: input.projectId,
     detail: {
       code: task.code,
       projectId: input.projectId,
@@ -145,7 +146,7 @@ export const TASK_START_ERROR = '只有待開始的任務才能啟動'
 export async function startTask(taskId: string): Promise<StartTaskResult> {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
-    select: { id: true, status: true },
+    select: { id: true, status: true, projectId: true },
   })
 
   if (!task) {
@@ -173,6 +174,7 @@ export async function startTask(taskId: string): Promise<StartTaskResult> {
     action: AuditActions.TASK_START,
     entityType: 'Task',
     entityId: updated.id,
+    projectId: task.projectId,
   })
 
   return {
@@ -249,6 +251,7 @@ export async function completeTask(taskId: string): Promise<CompleteTaskResult> 
     action: AuditActions.TASK_COMPLETE,
     entityType: 'Task',
     entityId: updated.id,
+    projectId: task.projectId,
   })
 
   return {
@@ -276,6 +279,7 @@ export async function updateTask(input: UpdateTaskInput): Promise<UpdateTaskResu
       assigneeId: true,
       plannedStartDate: true,
       targetDate: true,
+      projectId: true,
     },
   })
 
@@ -323,6 +327,7 @@ export async function updateTask(input: UpdateTaskInput): Promise<UpdateTaskResu
     entityType: 'Task',
     entityId: updated.id,
     actorId,
+    projectId: task.projectId,
     detail: {
       changes: dataToUpdate,
     },
