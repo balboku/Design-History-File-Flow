@@ -36,6 +36,9 @@ export function ProjectGantt({ tasks, onTaskClick }: ProjectGanttProps) {
     if (task.status === 'InProgress') bgColor = '#b9711f'
     if (task.status === 'Done') bgColor = '#0b8a63'
 
+    // 讀取前置任務（blockedBy）並轉換為 dependencies 陣列
+    const dependencies: string[] = task.blockedBy?.map((b: any) => b.id) || []
+
     return {
       id: task.id,
       name: `[${task.code}] ${task.title}`,
@@ -43,6 +46,7 @@ export function ProjectGantt({ tasks, onTaskClick }: ProjectGanttProps) {
       progress,
       start,
       end,
+      dependencies,
       styles: {
         backgroundColor: bgColor,
         backgroundSelectedColor: bgColor,

@@ -164,13 +164,89 @@ export function ProjectDashboardTab({ project, gate, lookupUsers }: Props) {
         />
       </div>
 
-      {/* 2. Primary Middle Row (Gantt Chart 8 Cols + Phase Gate 4 Cols) */}
+      {/* 2. Primary Middle Row (WBS + Gantt Split View 8 Cols + Phase Gate 4 Cols) */}
       <div className="col-span-12 lg:col-span-8 flex flex-col gap-6">
         <SectionCard
-          title="專案甘特圖"
-          subtitle="視覺化檢視開發任務的排程與進度狀態。"
+          title="WBS 任務排程"
+          subtitle="左側工作分解結構、右側甘特圖連動視圖。"
         >
-          <ProjectGantt tasks={project.tasks} />
+          <div className="flex gap-0 rounded-2xl border border-slate-200/60 overflow-hidden">
+            {/* 左側 WBS 資料表 */}
+            <div className="w-[400px] shrink-0 border-r border-slate-200/60 bg-slate-50/30 overflow-y-auto max-h-[480px]">
+              <table className="w-full text-[13px]">
+                <thead className="sticky top-0 z-10 bg-slate-100/90 backdrop-blur-sm">
+                  <tr className="border-b border-slate-200/60">
+                    <th className="px-3 py-2.5 text-left font-bold text-slate-600 w-[40%]">任務名稱</th>
+                    <th className="px-3 py-2.5 text-left font-bold text-slate-600 w-[20%]">負責人</th>
+                    <th className="px-3 py-2.5 text-left font-bold text-slate-600 w-[25%]">日期</th>
+                    <th className="px-3 py-2.5 text-left font-bold text-slate-600 w-[15%]">前置</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {project.tasks.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-3 py-8 text-center text-slate-400 font-medium">
+                        尚無任務資料
+                      </td>
+                    </tr>
+                  ) : (
+                    project.tasks.map((task) => (
+                      <tr
+                        key={task.id}
+                        onClick={() => {
+                          // 未來可串接編輯 Dialog
+                          // setTaskDialogOpen(true)
+                        }}
+                        className="border-b border-slate-100 cursor-pointer transition-colors hover:bg-blue-50/50"
+                      >
+                        <td className="px-3 py-2">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-bold text-slate-800 truncate">{task.code}</span>
+                            <span className="text-slate-500 truncate text-[12px]">{task.title}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-slate-600">
+                          {task.assignee?.name || <span className="text-slate-400">—</span>}
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex flex-col gap-0.5 text-[12px]">
+                            <span className="text-slate-500">
+                              {task.plannedStartDate ? new Date(task.plannedStartDate).toLocaleDateString('zh-TW') : '—'}
+                            </span>
+                            <span className="text-slate-400">
+                              → {task.targetDate ? new Date(task.targetDate).toLocaleDateString('zh-TW') : '—'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          {/* 顯示前置任務代碼 */}
+                          {(task as any).blockedBy?.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {(task as any).blockedBy.map((b: any) => (
+                                <span
+                                  key={b.id}
+                                  className="inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-700"
+                                >
+                                  {b.code || b.id?.slice(0, 6)}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 右側甘特圖 */}
+            <div className="flex-1 min-w-0 overflow-x-auto bg-white">
+              <ProjectGantt tasks={project.tasks} />
+            </div>
+          </div>
         </SectionCard>
       </div>
 

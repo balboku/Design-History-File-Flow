@@ -35,6 +35,7 @@ export interface KanbanTask {
   }[]
   blockedBy?: {
     id: string
+    code: string
     status: string
     title: string
   }[]

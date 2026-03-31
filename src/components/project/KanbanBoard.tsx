@@ -24,14 +24,15 @@ import { QuickUploadModal } from './QuickUploadModal'
 interface TaskEditDialogProps {
   task: KanbanTask & {
     checklistItems?: { id: string; content: string; isCompleted: boolean }[]
-    blockedBy?: { id: string; status: string; title: string }[]
+    blockedBy?: { id: string; code: string; title: string; status: string }[]
   }
   lookupUsers: { id: string; name: string; role: Role }[]
+  projectTasks: KanbanTask[]
   onClose: () => void
   onSaveSuccess: () => void
 }
 
-function TaskEditDialog({ task, lookupUsers, onClose, onSaveSuccess }: TaskEditDialogProps) {
+function TaskEditDialog({ task, lookupUsers, projectTasks, onClose, onSaveSuccess }: TaskEditDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isUploadingFile, setIsUploadingFile] = useState(false)
@@ -44,6 +45,10 @@ function TaskEditDialog({ task, lookupUsers, onClose, onSaveSuccess }: TaskEditD
   const [showChecklistSection, setShowChecklistSection] = useState(false)
   const [showAttachmentSection, setShowAttachmentSection] = useState(false)
   const [showCommentSection, setShowCommentSection] = useState(false)
+  // 前置任務選取狀態
+  const [selectedPredecessors, setSelectedPredecessors] = useState<string[]>(
+    task.blockedBy?.map((b) => b.id) || []
+  )
   const router = useRouter()
 
   const currentUserId = lookupUsers.find((u) => u.role === 'RD')?.id || ''
@@ -125,6 +130,7 @@ function TaskEditDialog({ task, lookupUsers, onClose, onSaveSuccess }: TaskEditD
         plannedStartDate: plannedStartDate || null,
         targetDate: targetDate || null,
         actorId: currentUserId || undefined,
+        blockedByIds: selectedPredecessors,
       })
 
       if (result.success) {
@@ -252,6 +258,76 @@ function TaskEditDialog({ task, lookupUsers, onClose, onSaveSuccess }: TaskEditD
               defaultValue={formatDateForInput(task.targetDate)}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[14px] text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none"
             />
+          </div>
+
+          {/* Predecessors (前置任務) */}
+          <div>
+            <label className="block text-[12px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+              前置任務 (Predecessors)
+            </label>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="flex flex-col gap-2 max-h-[180px] overflow-y-auto">
+                {projectTasks
+                  .filter((t) => t.id !== task.id) // 排除當前任務，避免循環依賴
+                  .map((t) => (
+                    <label
+                      key={t.id}
+                      className="flex items-center gap-2.5 cursor-pointer hover:bg-white px-2 py-1.5 rounded-lg transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedPredecessors.includes(t.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedPredecessors([...selectedPredecessors, t.id])
+                          } else {
+                            setSelectedPredecessors(selectedPredecessors.filter((id) => id !== t.id))
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-[13px] text-slate-700 font-medium">
+                        <span className="font-bold text-slate-800">{t.code}</span>
+                        <span className="text-slate-400 mx-1">·</span>
+                        {t.title}
+                      </span>
+                    </label>
+                  ))}
+                {projectTasks.filter((t) => t.id !== task.id).length === 0 && (
+                  <div className="text-[13px] text-slate-400 text-center py-2">
+                    專案中沒有其他可選擇的任務
+                  </div>
+                )}
+              </div>
+              {selectedPredecessors.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-slate-200">
+                  <div className="text-[11px] font-bold text-slate-500 mb-1.5">已選擇 {selectedPredecessors.length} 項前置任務</div>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedPredecessors.map((id) => {
+                      const t = projectTasks.find((pt) => pt.id === id)
+                      return (
+                        <span
+                          key={id}
+                          className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700"
+                        >
+                          {t?.code || id.slice(0, 6)}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPredecessors(selectedPredecessors.filter((pid) => pid !== id))}
+                            className="hover:text-amber-900"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+            <p className="mt-1 text-[11px] text-slate-400">
+              選擇此任務的前置任務，系統將在甘特圖中顯示連線關係。
+            </p>
           </div>
 
           {/* Attachments Section (Collapsible) */}
@@ -835,6 +911,7 @@ export function KanbanBoard({ projectId, tasks, lookupUsers }: Props) {
         <TaskEditDialog
           task={editingTask}
           lookupUsers={lookupUsers}
+          projectTasks={tasks}
           onClose={() => setEditingTask(null)}
           onSaveSuccess={() => {
             setEditingTask(null)

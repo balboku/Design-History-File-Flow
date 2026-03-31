@@ -53,6 +53,7 @@ export const AuditActions = {
   TASK_START: 'task.start',
   TASK_COMPLETE: 'task.complete',
   TASK_UPDATE: 'task.update',
+  TASK_AUTO_SCHEDULE: 'task.autoSchedule',
   DELIVERABLE_CREATE: 'deliverable.create',
   DELIVERABLE_STATUS_CHANGE: 'deliverable.statusChange',
   FILE_REVISION_UPLOAD: 'fileRevision.upload',

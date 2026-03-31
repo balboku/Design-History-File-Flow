@@ -16,6 +16,7 @@ export interface CreateTaskActionInput {
   deliverableIds: string[]
   plannedStartDate?: string | null
   targetDate?: string | null
+  blockedByIds?: string[]
 }
 
 export type CreateTaskActionResult = {
@@ -34,6 +35,7 @@ export async function createTaskAction(
       ...input,
       plannedStartDate: input.plannedStartDate ? new Date(input.plannedStartDate) : null,
       targetDate: input.targetDate ? new Date(input.targetDate) : null,
+      blockedByIds: input.blockedByIds,
     })
     return { success: true, data: result.task }
   } catch (err) {
@@ -100,6 +102,7 @@ export interface UpdateTaskActionInput {
   plannedStartDate?: string | null
   targetDate?: string | null
   actorId?: string | null
+  blockedByIds?: string[]
 }
 
 export type UpdateTaskActionResult = {
@@ -118,6 +121,7 @@ export async function updateTaskAction(
       ...input,
       plannedStartDate: input.plannedStartDate ? new Date(input.plannedStartDate) : undefined,
       targetDate: input.targetDate ? new Date(input.targetDate) : undefined,
+      blockedByIds: input.blockedByIds,
     })
     return { success: true, data: result.task }
   } catch (err) {
