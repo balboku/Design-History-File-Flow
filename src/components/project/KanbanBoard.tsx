@@ -42,6 +42,8 @@ function TaskEditDialog({ task, lookupUsers, onClose, onSaveSuccess }: TaskEditD
   const [comments, setComments] = useState<Array<{ id: string; content: string; authorName: string; createdAt: string }>>([])
   const [newComment, setNewComment] = useState('')
   const [showChecklistSection, setShowChecklistSection] = useState(false)
+  const [showAttachmentSection, setShowAttachmentSection] = useState(false)
+  const [showCommentSection, setShowCommentSection] = useState(false)
   const router = useRouter()
 
   const currentUserId = lookupUsers.find((u) => u.role === 'RD')?.id || ''
@@ -252,75 +254,94 @@ function TaskEditDialog({ task, lookupUsers, onClose, onSaveSuccess }: TaskEditD
             />
           </div>
 
-          {/* Attachments Upload Area */}
-          <div>
-            <label className="block text-[12px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-              參考附件（可選）
-            </label>
-            <div
-              onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
-              onDragOver={handleDrag}
-              onDrop={handleDrop}
-              className={`relative border-2 border-dashed rounded-xl p-4 transition-all ${
-                dragActive
-                  ? 'border-blue-400 bg-blue-50'
-                  : 'border-slate-200 bg-slate-50/50 hover:border-slate-300'
-              }`}
+          {/* Attachments Section (Collapsible) */}
+          <div className="border-t border-slate-100 pt-3">
+            <button
+              type="button"
+              onClick={() => setShowAttachmentSection(!showAttachmentSection)}
+              className="flex items-center justify-between w-full text-[12px] font-bold uppercase tracking-wider text-slate-600 mb-1.5 hover:text-slate-800"
             >
-              <input
-                type="file"
-                id="attachment-input"
-                onChange={(e) => handleFileUpload(e.currentTarget.files || new FileList())}
-                className="hidden"
-                disabled={isUploadingFile}
-              />
-              <label
-                htmlFor="attachment-input"
-                className="flex flex-col items-center gap-2 cursor-pointer"
+              <span>參考附件 ({attachments.length})</span>
+              <svg 
+                className={`h-4 w-4 transition-transform ${showAttachmentSection ? 'rotate-180' : ''}`} 
+                fill="none" viewBox="0 0 24 24" stroke="currentColor"
               >
-                <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {showAttachmentSection && (
+              <div className="space-y-3">
+                <div
+                  onDragEnter={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDragOver={handleDrag}
+                  onDrop={handleDrop}
+                  className={`relative border-2 border-dashed rounded-xl p-4 transition-all ${
+                    dragActive
+                      ? 'border-blue-400 bg-blue-50'
+                      : 'border-slate-200 bg-slate-50/50 hover:border-slate-300'
+                  }`}
+                >
+                  <input
+                    type="file"
+                    id="attachment-input"
+                    onChange={(e) => handleFileUpload(e.currentTarget.files || new FileList())}
+                    className="hidden"
+                    disabled={isUploadingFile}
                   />
-                </svg>
-                <span className="text-[12px] font-bold text-slate-600">
-                  {isUploadingFile ? '上傳中...' : '拖放檔案或點擊選擇'}
-                </span>
-              </label>
-            </div>
-
-            {/* Attachments List */}
-            {attachments.length > 0 && (
-              <div className="mt-2 flex flex-col gap-1.5">
-                {attachments.map((att) => (
-                  <div
-                    key={att.id}
-                    className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-[12px]"
+                  <label
+                    htmlFor="attachment-input"
+                    className="flex flex-col items-center gap-2 cursor-pointer"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <svg className="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                        />
-                      </svg>
-                      <span className="truncate text-slate-700 font-medium">{att.fileName}</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveAttachment(att.id)}
-                      className="shrink-0 text-slate-400 hover:text-red-600 transition-colors"
-                    >
-                      ✕
-                    </button>
+                    <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 4v16m8-8H4"
+                      />
+                    </svg>
+                    <span className="text-[12px] font-bold text-slate-600">
+                      {isUploadingFile ? '上傳中...' : '拖放檔案或點擊選擇'}
+                    </span>
+                  </label>
+                </div>
+                
+                <p className="px-1 text-[11px] font-bold text-amber-600 bg-amber-50 rounded-md py-1">
+                  ⚠️ 提示：此處僅供上傳開發參考附件，正式 DHF 報告請至『文件庫』上傳新版次。
+                </p>
+
+                {/* Attachments List */}
+                {attachments.length > 0 && (
+                  <div className="mt-2 flex flex-col gap-1.5">
+                    {attachments.map((att) => (
+                      <div
+                        key={att.id}
+                        className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-[12px]"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <svg className="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                            />
+                          </svg>
+                          <span className="truncate text-slate-700 font-medium">{att.fileName}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAttachment(att.id)}
+                          className="shrink-0 text-slate-400 hover:text-red-600 transition-colors"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             )}
           </div>
@@ -409,12 +430,24 @@ function TaskEditDialog({ task, lookupUsers, onClose, onSaveSuccess }: TaskEditD
             )}
           </div>
 
-          {/* Comments Section */}
-          <div>
-            <div className="text-[12px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-              討論留言
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+          {/* Comments Section (Collapsible) */}
+          <div className="border-t border-slate-100 pt-3">
+            <button
+              type="button"
+              onClick={() => setShowCommentSection(!showCommentSection)}
+              className="flex items-center justify-between w-full text-[12px] font-bold uppercase tracking-wider text-slate-600 mb-1.5 hover:text-slate-800"
+            >
+              <span>討論留言 ({comments.length})</span>
+              <svg 
+                className={`h-4 w-4 transition-transform ${showCommentSection ? 'rotate-180' : ''}`} 
+                fill="none" viewBox="0 0 24 24" stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {showCommentSection && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
               {/* Existing Comments */}
               {comments.length > 0 && (
                 <div className="flex flex-col gap-2 mb-3 max-h-32 overflow-y-auto">
@@ -471,7 +504,8 @@ function TaskEditDialog({ task, lookupUsers, onClose, onSaveSuccess }: TaskEditD
                 </button>
               </div>
             </div>
-          </div>
+          )}
+        </div>
 
           {/* Buttons */}
           <div className="flex justify-end gap-2.5 pt-2">
@@ -519,6 +553,8 @@ export function KanbanBoard({ projectId, tasks, lookupUsers }: Props) {
     taskCode: string
     taskTitle: string
     missingDeliverables: { deliverableId: string; deliverableCode: string; deliverableTitle: string }[]
+    onlyUpload?: boolean
+    allDeliverables?: { deliverableId: string; deliverableCode: string; deliverableTitle: string }[]
   } | null>(null)
   
   // Ghost Dropzone state (direct file drop onto TaskCard)
@@ -757,7 +793,28 @@ export function KanbanBoard({ projectId, tasks, lookupUsers }: Props) {
               isOver={overColumn === col}
             >
               {tasksByColumn[col].map((task) => (
-                <TaskCard key={task.id} task={task} onFileDrop={handleGhostFileDrop} onClick={(t) => setEditingTask(t)} />
+                <TaskCard 
+                  key={task.id} 
+                  task={task} 
+                  onFileDrop={handleGhostFileDrop} 
+                  onQuickUpload={(t) => setUploadModal({
+                    taskId: t.id,
+                    taskCode: t.code,
+                    taskTitle: t.title,
+                    missingDeliverables: t.deliverableLinks.map(l => ({
+                      deliverableId: l.deliverable.id,
+                      deliverableCode: l.deliverable.code,
+                      deliverableTitle: l.deliverable.title
+                    })),
+                    onlyUpload: true,
+                    allDeliverables: t.deliverableLinks.map(l => ({
+                      deliverableId: l.deliverable.id,
+                      deliverableCode: l.deliverable.code,
+                      deliverableTitle: l.deliverable.title
+                    }))
+                  })}
+                  onClick={(t) => setEditingTask(t)} 
+                />
               ))}
               {tasksByColumn[col].length === 0 && (
                 <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-200 py-8 text-[13px] font-medium text-slate-400">
@@ -838,6 +895,8 @@ export function KanbanBoard({ projectId, tasks, lookupUsers }: Props) {
           taskCode={uploadModal.taskCode}
           taskTitle={uploadModal.taskTitle}
           missingDeliverables={uploadModal.missingDeliverables}
+          onlyUpload={uploadModal.onlyUpload}
+          allDeliverables={uploadModal.allDeliverables}
           lookupUsers={lookupUsers}
           onSuccess={handleUploadSuccess}
           onClose={() => setUploadModal(null)}

@@ -13,7 +13,11 @@ import {
 import { ProjectGantt } from '@/components/project-gantt'
 import { PHASE_ORDER } from '@/lib/phase-service'
 import { advancePhaseAction } from '@/actions/phase-actions'
+import { createTaskAction } from '@/actions/task-actions'
+import { createDeliverableAction } from '@/actions/deliverable-actions'
 import { ComplianceDebtRadar } from '@/components/project/ComplianceDebtRadar'
+import { KanbanBoard } from '@/components/project/KanbanBoard'
+import type { KanbanTask } from '@/components/project/TaskCard'
 import {
   formatProjectPhase,
   formatTaskStatus,
@@ -75,6 +79,8 @@ interface Task {
 
 interface Deliverable {
   id: string
+  code: string
+  title: string
   status: string
   isRequired?: boolean
   targetDate?: Date | string | null
@@ -102,6 +108,11 @@ export function ProjectDashboardTab({ project, gate, lookupUsers }: Props) {
   const router = useRouter()
   const [gateDialogOpen, setGateDialogOpen] = useState(false)
   const [gateError, setGateError] = useState<string | null>(null)
+  
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false)
+  const [taskError, setTaskError] = useState<string | null>(null)
+  const [deliverableDialogOpen, setDeliverableDialogOpen] = useState(false)
+  const [deliverableError, setDeliverableError] = useState<string | null>(null)
 
   const doneTasks = project.tasks.filter((t) => t.status === 'Done').length
   const atRiskTasks = project.tasks.filter(
@@ -112,6 +123,11 @@ export function ProjectDashboardTab({ project, gate, lookupUsers }: Props) {
   const openPendingItems = project.pendingItems.filter((i) => i.status === 'Open').length
 
   const pmUsers = lookupUsers.filter((u) => u.role === Role.PM || u.role === Role.ADMIN)
+  const rdUsers = lookupUsers.filter((u) => u.role === Role.RD)
+  const qaUsers = lookupUsers.filter((u) => u.role === Role.QA || u.role === Role.ADMIN)
+
+  const kanbanTasks: KanbanTask[] = project.tasks as unknown as KanbanTask[]
+  const darkInputClass = "w-full rounded-xl border border-white/16 bg-white/10 px-4 py-3 text-[14px] font-medium text-[#fff7ec] placeholder-white/40 transition-colors focus:border-white/40 focus:bg-white/15 focus:outline-none"
 
   return (
     <div className="flex flex-col gap-6 lg:grid lg:grid-cols-12 lg:gap-6">
@@ -234,56 +250,47 @@ export function ProjectDashboardTab({ project, gate, lookupUsers }: Props) {
         </SectionCard>
       </div>
 
-      {/* 3. Bottom Row: Active Tasks (4 cols) & Pending Items (4 cols) & Phase History (4 cols) */}
-      <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
+      {/* 3. Kanban Board (Full Width Middle Row) */}
+      <div className="col-span-12">
         <SectionCard
-          title="開發任務"
-          subtitle="可跨越專案當前階段的進行中事項"
+          title="開發任務看板"
+          subtitle="結合規劃與排程。拖曳卡片以更新進度，正式結案前須上傳對應文件。"
         >
+          {/* Action Buttons Row */}
+          <div className="mb-5 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setTaskDialogOpen(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-5 py-2.5 text-[14px] font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              建立任務
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeliverableDialogOpen(true)}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-[14px] font-bold text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              新增文件空殼
+            </button>
+          </div>
+
           {project.tasks.length === 0 ? (
-            <EmptyPanel title="尚無任務" body="在 Planning 頁籤增添任務" />
+            <EmptyPanel title="尚無任務" body="點擊「建立任務」開始規劃內容。" />
           ) : (
-            <div className="flex max-h-[460px] flex-col gap-3 overflow-y-auto pr-1">
-              {project.tasks.map((task) => {
-                const isOverdue =
-                  !!task.targetDate &&
-                  new Date(task.targetDate as string) < new Date() &&
-                  task.status !== 'Done'
-                return (
-                  <div
-                    key={task.id}
-                    className="group relative flex flex-col items-start gap-1 rounded-2xl border border-slate-200/60 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
-                  >
-                    <div className="flex w-full items-start justify-between gap-2">
-                      <div className="flex flex-col">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                          {task.code}
-                        </span>
-                        <h4 className="mt-1 m-0 text-base font-bold tracking-tight text-slate-800">
-                          {task.title}
-                        </h4>
-                      </div>
-                      <div className="flex shrink-0 gap-1.5 flex-wrap justify-end">
-                        <StatusPill
-                          label={formatTaskStatus(task.status as any)}
-                          tone={isOverdue ? 'critical' : 'neutral'} // Visual Noise filter
-                        />
-                        {isOverdue && <StatusPill label="逾期" tone="critical" />}
-                      </div>
-                    </div>
-                    <div className="mt-2 text-[13px] font-medium text-slate-500">
-                      指派：{task.assignee?.name ?? '–'} <span className="mx-1 text-slate-300">|</span> 期待：
-                      {formatProjectPhase(task.plannedPhase)}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+            <KanbanBoard projectId={project.id} tasks={kanbanTasks} lookupUsers={lookupUsers} />
           )}
         </SectionCard>
       </div>
 
-      <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
+      {/* 4. Bottom Row: Pending Items (6 cols) & Phase History (6 cols) */}
+
+      <div className="col-span-12 lg:col-span-6 flex flex-col gap-6">
         <SectionCard
           title="未結遺留項"
           subtitle="條件式放行後的殘餘風險追蹤"
@@ -321,7 +328,7 @@ export function ProjectDashboardTab({ project, gate, lookupUsers }: Props) {
         </SectionCard>
       </div>
 
-      <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
+      <div className="col-span-12 lg:col-span-6 flex flex-col gap-6">
         <SectionCard
           title="階段異動歷史"
           subtitle="團隊推進決策的稽核軌跡"
@@ -358,6 +365,228 @@ export function ProjectDashboardTab({ project, gate, lookupUsers }: Props) {
           )}
         </SectionCard>
       </div>
+
+      {/* 5. Additional Dialogs */}
+      {taskDialogOpen && (
+        <dialog
+          open
+          className="fixed inset-0 z-50 flex h-[100vh] w-[100vw] items-center justify-center m-0 bg-slate-900/50 p-4 sm:p-6 backdrop-blur-[2px]"
+          onClick={(e) => { if (e.target === e.currentTarget) setTaskDialogOpen(false) }}
+        >
+          <div
+            className="w-full max-w-[520px] max-h-[90vh] overflow-y-auto rounded-[32px] p-7 sm:p-9 text-[#f2fbfc]"
+            style={{
+              background: 'linear-gradient(135deg, rgba(10,73,90,0.97), rgba(8,58,72,0.95))',
+              border: '1px solid rgba(203,241,248,0.12)',
+              boxShadow: '0 32px 80px rgba(3,33,44,0.4)',
+            }}
+          >
+            <div className="mb-6 flex items-start justify-between">
+              <div>
+                <h3 className="m-0 text-xl font-bold tracking-tight text-[#f2fbfc]">建立開發任務</h3>
+                <p className="mt-1 mb-0 text-[14px] text-[rgba(218,245,250,0.7)]">任務必須至少綁定一份文件空殼。</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTaskDialogOpen(false)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/60 transition-colors hover:bg-white/20 hover:text-white focus:outline-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              action={async (formData: FormData) => {
+                setTaskError(null)
+                const res = await createTaskAction({
+                  projectId: project.id,
+                  code: String(formData.get('code') ?? ''),
+                  title: String(formData.get('title') ?? ''),
+                  description: String(formData.get('description') ?? '') || undefined,
+                  assigneeId: String(formData.get('assigneeId') ?? '') || undefined,
+                  createdById: String(formData.get('createdById') ?? '') || undefined,
+                  plannedPhase: String(formData.get('plannedPhase') ?? ProjectPhase.Planning) as ProjectPhase,
+                  deliverableIds: formData.getAll('deliverableIds').map(String),
+                  plannedStartDate: String(formData.get('plannedStartDate') ?? '') || null,
+                  targetDate: String(formData.get('targetDate') ?? '') || null,
+                })
+                if (res.success) {
+                  setTaskDialogOpen(false)
+                  router.refresh()
+                } else {
+                  setTaskError(res.error || '建立任務失敗，請稍後再試')
+                }
+              }}
+              className="flex flex-col gap-4"
+            >
+              {taskError && (
+                <div className="flex items-center gap-2.5 rounded-lg bg-red-50 px-3.5 py-3 text-[13px] font-bold text-red-700">
+                  <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {taskError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <input name="code" placeholder="任務代碼（如 DI-001）" className={darkInputClass} required />
+                <input name="title" placeholder="任務名稱" className={darkInputClass} required />
+              </div>
+              <textarea
+                name="description"
+                placeholder="任務描述"
+                className={`${darkInputClass} min-h-[80px] resize-y`}
+              />
+              <select name="plannedPhase" defaultValue={project.currentPhase} className={darkInputClass}>
+                {Object.values(ProjectPhase).map((phase) => (
+                  <option key={phase} value={phase}>{formatProjectPhase(phase)}</option>
+                ))}
+              </select>
+              <select name="assigneeId" defaultValue="" className={darkInputClass}>
+                <option value="">稍後再指派研發工程師</option>
+                {rdUsers.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[12px] font-bold text-[rgba(218,245,250,0.7)]">預計開始日</label>
+                  <input type="date" name="plannedStartDate" className={darkInputClass} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[12px] font-bold text-[rgba(218,245,250,0.7)]">預計完成日</label>
+                  <input type="date" name="targetDate" className={darkInputClass} />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[12px] font-bold text-[rgba(218,245,250,0.7)]">
+                  綁定文件空殼 (必選至少一項, 可複選)
+                </label>
+                <select
+                  name="deliverableIds"
+                  multiple
+                  defaultValue={project.deliverables.slice(0, 1).map((d) => d.id)}
+                  className={`${darkInputClass} min-h-[110px]`}
+                  required
+                >
+                  {project.deliverables.map((d) => (
+                    <option key={d.id} value={d.id}>{d.code} · {d.title}</option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                className="mt-2 w-full rounded-xl bg-[rgba(255,244,223,0.92)] px-5 py-4 text-[15px] font-bold text-[#442e17] shadow transition-all hover:-translate-y-0.5 hover:bg-white focus:outline-none"
+              >
+                建立可追溯任務
+              </button>
+            </form>
+          </div>
+        </dialog>
+      )}
+
+      {deliverableDialogOpen && (
+        <dialog
+          open
+          className="fixed inset-0 z-50 flex h-[100vh] w-[100vw] items-center justify-center m-0 bg-slate-900/50 p-4 sm:p-6 backdrop-blur-[2px]"
+          onClick={(e) => { if (e.target === e.currentTarget) setDeliverableDialogOpen(false) }}
+        >
+          <div
+            className="w-full max-w-[480px] max-h-[90vh] overflow-y-auto rounded-[32px] p-7 sm:p-9 text-[#f2fbfc]"
+            style={{
+              background: 'linear-gradient(135deg, rgba(10,73,90,0.97), rgba(8,58,72,0.95))',
+              border: '1px solid rgba(203,241,248,0.12)',
+              boxShadow: '0 32px 80px rgba(3,33,44,0.4)',
+            }}
+          >
+            <div className="mb-6 flex items-start justify-between">
+              <div>
+                <h3 className="m-0 text-xl font-bold tracking-tight text-[#f2fbfc]">新增文件空殼</h3>
+                <p className="mt-1 mb-0 text-[14px] text-[rgba(218,245,250,0.7)]">建立後可在 DHF 合規文件頁籤上傳版次與審核。</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeliverableDialogOpen(false)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/60 transition-colors hover:bg-white/20 hover:text-white focus:outline-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              action={async (formData: FormData) => {
+                setDeliverableError(null)
+                const res = await createDeliverableAction({
+                  projectId: project.id,
+                  code: String(formData.get('code') ?? ''),
+                  title: String(formData.get('title') ?? ''),
+                  description: String(formData.get('description') ?? '') || undefined,
+                  phase: String(formData.get('phase') ?? project.currentPhase) as ProjectPhase,
+                  ownerId: String(formData.get('ownerId') ?? '') || undefined,
+                  isRequired: formData.get('isRequired') === 'true',
+                  actorId: String(formData.get('actorId') ?? ''),
+                  targetDate: String(formData.get('targetDate') ?? '') || null,
+                })
+                if (res.success) {
+                  setDeliverableDialogOpen(false)
+                  router.refresh()
+                } else {
+                  setDeliverableError(res.error || '建立文件空殼失敗，請稍後再試')
+                }
+              }}
+              className="flex flex-col gap-4"
+            >
+              {deliverableError && (
+                <div className="flex items-center gap-2.5 rounded-lg bg-red-50 px-3.5 py-3 text-[13px] font-bold text-red-700">
+                  <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {deliverableError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <input name="code" placeholder="文件代碼（如 DHF-001）" className={darkInputClass} required />
+                <input name="title" placeholder="文件名稱" className={darkInputClass} required />
+              </div>
+              <textarea
+                name="description"
+                placeholder="文件說明（選填）"
+                className={`${darkInputClass} min-h-[80px] resize-y`}
+              />
+              <select name="phase" defaultValue={project.currentPhase} className={darkInputClass}>
+                {Object.values(ProjectPhase).map((phase) => (
+                  <option key={phase} value={phase}>{formatProjectPhase(phase)}</option>
+                ))}
+              </select>
+              <select name="ownerId" defaultValue="" className={darkInputClass}>
+                <option value="">稍後再指定品保負責人</option>
+                {qaUsers.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+              <select name="actorId" defaultValue="" className={darkInputClass} required>
+                <option value="" disabled>操作者（目前帳號）</option>
+                {lookupUsers.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[12px] font-bold text-[rgba(218,245,250,0.7)]">預計交件日</label>
+                <input type="date" name="targetDate" className={darkInputClass} />
+              </div>
+              <button
+                type="submit"
+                className="mt-2 w-full rounded-xl bg-[rgba(255,244,223,0.92)] px-5 py-4 text-[15px] font-bold text-[#442e17] shadow transition-all hover:-translate-y-0.5 hover:bg-white focus:outline-none"
+              >
+                建立文件空殼
+              </button>
+            </form>
+          </div>
+        </dialog>
+      )}
 
       {/* 4. Soft UI UX Phase Advance Dialog */}
       {gateDialogOpen && (

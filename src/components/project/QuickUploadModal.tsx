@@ -16,6 +16,8 @@ interface Props {
   taskTitle: string
   missingDeliverables: MissingDeliverable[]
   lookupUsers: { id: string; name: string; role: Role }[]
+  onlyUpload?: boolean
+  allDeliverables?: MissingDeliverable[]
   onSuccess: () => void
   onClose: () => void
 }
@@ -28,6 +30,8 @@ export function QuickUploadModal({
   lookupUsers,
   onSuccess,
   onClose,
+  onlyUpload = false,
+  allDeliverables = [],
 }: Props) {
   const [isDraggingOver, setIsDraggingOver] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -66,7 +70,11 @@ export function QuickUploadModal({
     if (changeSummary) formData.append('changeSummary', changeSummary)
 
     try {
-      const res = await fetch(`/api/tasks/${taskId}/complete-with-upload`, {
+      const endpoint = onlyUpload 
+        ? `/api/tasks/${taskId}/upload-only` 
+        : `/api/tasks/${taskId}/complete-with-upload`
+      
+      const res = await fetch(endpoint, {
         method: 'POST',
         body: formData,
       })
@@ -102,7 +110,7 @@ export function QuickUploadModal({
                 </span>
               </div>
               <h3 className="m-0 text-xl font-bold tracking-tight text-slate-900">
-                標記完成前須上傳文件
+                {onlyUpload ? '快速上傳新版次' : '標記完成前須上傳文件'}
               </h3>
               <p className="mt-1.5 mb-0 text-[14px] font-medium leading-relaxed text-slate-500">
                 <span className="text-[12px] font-bold uppercase tracking-wider text-slate-400 mr-1">{taskCode}</span>
@@ -120,19 +128,21 @@ export function QuickUploadModal({
         </div>
 
         <div className="p-7 flex flex-col gap-5">
-          {/* Missing Deliverables */}
+          {/* Deliverables List */}
           <div>
-            <div className="mb-2.5 text-[12px] font-bold uppercase tracking-wider text-slate-400">缺少版次的文件 ({missingDeliverables.length} 份)</div>
+            <div className="mb-2.5 text-[12px] font-bold uppercase tracking-wider text-slate-400">
+              {onlyUpload ? '將上傳至以下文件' : `缺少版次的文件 (${missingDeliverables.length} 份)`}
+            </div>
             <div className="flex flex-col gap-2">
-              {missingDeliverables.map((d) => (
-                <div key={d.deliverableId} className="flex items-center gap-2.5 rounded-xl border border-orange-100 bg-orange-50/50 p-3">
-                  <span className="rounded bg-orange-100 px-1.5 py-0.5 text-[11px] font-bold text-orange-700">{d.deliverableCode}</span>
+              {(onlyUpload ? allDeliverables : missingDeliverables).map((d) => (
+                <div key={d.deliverableId} className="flex items-center gap-2.5 rounded-xl border border-blue-100 bg-blue-50/50 p-3">
+                  <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[11px] font-bold text-blue-700">{d.deliverableCode}</span>
                   <span className="text-[13px] font-medium text-slate-700">{d.deliverableTitle}</span>
                 </div>
               ))}
             </div>
             <p className="mt-2.5 text-[12px] text-slate-500 leading-relaxed">
-              上傳的檔案將同時登記至以上所有文件，作為 r1 初版。
+              上傳的檔案將作為最新版次登記。
             </p>
           </div>
 
@@ -220,9 +230,16 @@ export function QuickUploadModal({
               type="button"
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="w-full rounded-xl bg-slate-800 px-5 py-4 text-[15px] font-bold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2"
+              className={`w-full rounded-xl px-5 py-4 text-[15px] font-bold text-white shadow-md transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                onlyUpload 
+                  ? 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-400' 
+                  : 'bg-slate-800 hover:bg-slate-700 focus:ring-slate-400'
+              }`}
             >
-              {isSubmitting ? '上傳並結案中…' : '上傳文件並標記任務完成'}
+              {isSubmitting 
+                ? (onlyUpload ? '上傳中…' : '上傳並結案中…') 
+                : (onlyUpload ? '確認上傳新版次' : '上傳文件並標記任務完成')
+              }
             </button>
             <button
               type="button"

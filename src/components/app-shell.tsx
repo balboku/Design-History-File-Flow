@@ -10,13 +10,10 @@ export interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: '/', label: '總覽', caption: '專案戰情中心' },
-  { href: '/projects', label: '專案組合', caption: '專案建立與盤點' },
-  { href: '/tasks', label: '開發任務', caption: '研發執行流' },
-  { href: '/deliverables', label: '合規文件', caption: 'Placeholder 與版次' },
-  { href: '/phase-gates', label: '階段關卡', caption: 'Soft / Hard Gate' },
-  { href: '/change-requests', label: '變更管理', caption: '設計移轉後控管' },
-  { href: '/pending-items', label: '遺留項', caption: '條件式放行追蹤' },
+  { href: '/', label: '戰情首頁', caption: '待辦審查與專案概況' },
+  { href: '/projects', label: '專案總覽', caption: '管理所有研發專案' },
+  { href: '/change-requests', label: '變更管理', caption: '上市/移轉後變更單' },
+  { href: '/pending-items', label: '待補齊項目', caption: '條件式放行追蹤' },
 ]
 
 export function AppShell({
@@ -317,7 +314,7 @@ export function StatusPill({
         ? { background: 'rgba(185, 113, 31, 0.12)', color: 'var(--app-accent)' }
         : tone === 'critical'
           ? { background: 'rgba(191, 74, 60, 0.12)', color: 'var(--app-danger)' }
-          : { background: 'rgba(11, 99, 120, 0.1)', color: 'var(--app-primary-strong)' }
+          : { background: 'rgba(148, 163, 184, 0.1)', color: '#64748b' } // Tone-down neutral to gray
 
   return (
     <span

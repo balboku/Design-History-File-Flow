@@ -7,7 +7,6 @@ import {
   AppShell,
   EmptyPanel,
 } from '@/components/app-shell'
-import { ProjectPlanningTab } from '@/components/project/ProjectPlanningTab'
 import { ProjectDashboardTab } from '@/components/project/ProjectDashboardTab'
 import { ProjectComplianceTab } from '@/components/project/ProjectComplianceTab'
 import { ActivityLogTab } from '@/components/project/ActivityLogTab'
@@ -57,10 +56,9 @@ export default async function ProjectDetailPage({
   const activeTab = urlState.tab ?? 'dashboard'
 
   const tabs = [
-    { id: 'planning', label: '規劃', href: buildUrl(projectId, { tab: 'planning' }) },
-    { id: 'dashboard', label: '執行監控', href: buildUrl(projectId, { tab: 'dashboard' }) },
-    { id: 'compliance', label: 'DHF 合規文件', href: buildUrl(projectId, { tab: 'compliance' }) },
-    { id: 'activity', label: '活動紀錄', href: buildUrl(projectId, { tab: 'activity' }) },
+    { id: 'dashboard', label: '任務看板 (Board)', href: buildUrl(projectId, { tab: 'dashboard' }) },
+    { id: 'compliance', label: 'DHF 文件庫 (Documents)', href: buildUrl(projectId, { tab: 'compliance' }) },
+    { id: 'activity', label: '歷史軌跡 (History)', href: buildUrl(projectId, { tab: 'activity' }) },
   ]
 
   return (
@@ -136,12 +134,6 @@ export default async function ProjectDetailPage({
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'planning' && (
-        <ProjectPlanningTab
-          project={project}
-          lookupUsers={lookup.users}
-        />
-      )}
 
       {activeTab === 'dashboard' && (
         <ProjectDashboardTab

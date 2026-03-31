@@ -21,7 +21,7 @@ export const projectPhaseLabels: Record<ProjectPhase, string> = {
   DesignOutput: '設計輸出',
   Verification: '驗證',
   Validation: '確效',
-  DesignTransfer: '設計移轉',
+  DesignTransfer: '設計移轉 (量產準備)',
   PostMarket: '上市後',
 }
 
@@ -39,8 +39,8 @@ export const taskStatusLabels: Record<TaskStatus, string> = {
 }
 
 export const pendingItemStatusLabels: Record<PendingItemStatus, string> = {
-  Open: '未結案',
-  Resolved: '已補齊',
+  Open: '待補齊項目',
+  Resolved: '已補結案',
 }
 
 export const changeRequestStatusLabels: Record<ChangeRequestStatus, string> = {
@@ -83,7 +83,7 @@ export function formatAdvanceOutcome(outcome: 'advanced' | 'forced' | 'warning')
     case 'advanced':
       return '正常放行'
     case 'forced':
-      return '條件式放行'
+      return '特准放行 (條件式通過)'
     case 'warning':
       return '需檢視警示'
   }

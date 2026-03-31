@@ -44,10 +44,11 @@ interface Props {
   task: KanbanTask
   isDragOverlay?: boolean
   onFileDrop?: (taskId: string, files: FileList) => void
+  onQuickUpload?: (task: KanbanTask) => void
   onClick?: (task: KanbanTask) => void
 }
 
-export function TaskCard({ task, isDragOverlay = false, onFileDrop, onClick }: Props) {
+export function TaskCard({ task, isDragOverlay = false, onFileDrop, onQuickUpload, onClick }: Props) {
   const [isGhostHover, setIsGhostHover] = useState(false)
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
@@ -128,8 +129,8 @@ export function TaskCard({ task, isDragOverlay = false, onFileDrop, onClick }: P
             : isGhostHover
               ? 'border-blue-400 bg-blue-50 ring-4 ring-blue-500/20'
               : allFilesUploaded && task.status === 'InProgress'
-                ? 'cursor-grab border-l-4 border-emerald-400 hover:border-emerald-400 hover:shadow-md active:cursor-grabbing'
-                : 'cursor-grab border-slate-200/60 hover:border-slate-300 hover:shadow-md active:cursor-grabbing'
+                ? 'cursor-grab border-l-4 border-emerald-300 bg-slate-50/20 hover:border-emerald-400 hover:shadow-md active:cursor-grabbing'
+                : 'cursor-grab border-slate-100/50 hover:border-slate-300 hover:shadow-md active:cursor-grabbing'
       }`}
     >
       {/* Ghost Drop Overlay */}
@@ -228,16 +229,30 @@ export function TaskCard({ task, isDragOverlay = false, onFileDrop, onClick }: P
             </div>
           )}
 
-          <span className={`text-[11px] font-bold ${
-            (hasChecklists ? completedCount === checklistItems.length : allFilesUploaded) ? 'text-emerald-600' : 'text-slate-400'
-          }`}>
-            {hasChecklists 
-              ? `${completedCount}/${checklistItems.length} 項目完成`
-              : `${uploadedCount}/${task.deliverableLinks.length} 交付項目`
-            }
-            {attachmentCount > 0 && ` · ${attachmentCount} 附件`}
-            {(hasChecklists ? completedCount === checklistItems.length : allFilesUploaded) && task.status === 'InProgress' && ' · 可結案'}
-          </span>
+          <div className="flex items-center justify-between mt-1">
+            <span className={`text-[11px] font-bold ${
+              (hasChecklists ? completedCount === checklistItems.length : allFilesUploaded) ? 'text-emerald-600' : 'text-slate-400'
+            }`}>
+              {hasChecklists 
+                ? `${completedCount}/${checklistItems.length} 項目完成`
+                : `${uploadedCount}/${task.deliverableLinks.length} 交付項目`
+              }
+              {attachmentCount > 0 && ` · ${attachmentCount} 附件`}
+            </span>
+            
+            {!allFilesUploaded && task.status === 'InProgress' && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onQuickUpload?.(task)
+                }}
+                className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-600 hover:bg-blue-100 transition-colors"
+              >
+                📎 快速上傳
+              </button>
+            )}
+          </div>
         </div>
       )}
 
